@@ -192,19 +192,3 @@
     window.NA_SEND('custom001');
   }, true);
 })();
-// 2. NA_SEND 전환 전송 함수
-<script type="text/javascript">
-(function () {
-  if (window.top !== window.self) return;
-  window.NA_SEND = function (type) {
-    try {
-      if (!window.wcs) return;
-      if (!window.wcs_add) window.wcs_add = {};
-      wcs_add["wa"] = "s_4d7836409a97";
-      if (!window._nasa) window._nasa = {};
-      _nasa["cnv"] = wcs.cnv(type === 'schedule' ? "2" : "5", "1");
-      wcs_do(_nasa);
-    } catch (e) {}
-  };
-})();
-</script>
