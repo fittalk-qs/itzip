@@ -112,76 +112,18 @@
   window.wcs_add['wa'] = 's_4d7836409a97';
   window._nasa = window._nasa || {};
 
-  // 랜딩 시점 쿼리를 동결. 세션 내 재진입/라우팅 이후에도 유입 정보를 잃지 않습니다.
-  var LANDING = location.href;
-  try {
-    if (/[?&](n_|NaPm=|utm_)/.test(location.search)) {
-      sessionStorage.setItem('naLanding', LANDING);
-      sessionStorage.setItem('naRef', document.referrer || '');
-    }
-    var saved = sessionStorage.getItem('naLanding');
-    if (saved) LANDING = saved;
-  } catch (e) {}
-
-  // www / non-www 쿠키 공유. wcslog 가 굽기 전에 도메인을 올려둡니다.
-  try {
-    var host = location.hostname.replace(/^www\./, '');
-    if (host.indexOf('.') > 0) {
-      window.wcs_add['cookie_domain'] = '.' + host;
-      window.wcs_add['cd'] = '.' + host;
-    }
-  } catch (e) {}
-
-  function run() {
-    if (!window.wcs) return;
-    try {
-      var cur = location.href;
-      var savedRef = '';
-      try { savedRef = sessionStorage.getItem('naRef') || ''; } catch (e) {}
-
-      // inflow 는 location.search 와 document.referrer 를 읽습니다.
-      // 라우팅으로 쿼리가 사라졌으면 잠깐 되돌린 뒤 복구합니다.
-      if (LANDING && LANDING !== cur) {
-        history.replaceState(null, '', LANDING);
-      }
-      if (savedRef && !document.referrer) {
-        try {
-          Object.defineProperty(document, 'referrer', {
-            configurable: true,
-            get: function () { return savedRef; }
-          });
-        } catch (e) {}
-      }
-
-      window.wcs.inflow();
-      window.wcs_do();
-
-      if (LANDING && LANDING !== cur) {
-        history.replaceState(null, '', cur);
-      }
-    } catch (e) {
-      try { window.wcs.inflow(); window.wcs_do(); } catch (e2) {}
-    }
-  }
-
   var s = document.createElement('script');
   s.type = 'text/javascript';
   s.async = true;
   s.src = 'https://wcs.naver.net/wcslog.js';
-  s.onload = run;
+  s.onload = function () {
+    try {
+      if (!window.wcs) return;
+      window.wcs.inflow();
+      window.wcs_do();
+    } catch (e) {}
+  };
   (document.head || document.documentElement).appendChild(s);
-
-  // 로드 실패/캐시 등으로 onload 가 안 붙는 경우 대비
-  var t = 0;
-  (function poll() {
-    if (window.wcs && !window.__NA_INFLOW_DONE) {
-      window.__NA_INFLOW_DONE = 1;
-      run();
-      return;
-    }
-    if (++t > 100) return;
-    setTimeout(poll, 100);
-  })();
 })();
 
 /* ===== itzip-head-5-conversion.js ===== */
