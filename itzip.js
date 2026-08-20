@@ -1558,6 +1558,9 @@ window.fitReserve = function (mount) {
     if (hnum < 18) timeOptions += '<option value="' + hh + ':30">' + hh + ':30</option>';
   }
 
+  // .vr-row 는 폼이 넓을 때(본문 860) 한 줄에 두 칸씩 세우려고 묶어 둔 것입니다.
+  // 좁을 때는 그냥 div 라서 예전처럼 한 줄에 한 칸씩 쌓입니다. 가르는 것은
+  // itzip-3-reserve.css 의 컨테이너 쿼리 하나뿐이고 여기 JS 는 몰라도 됩니다.
   var root = document.createElement('div');
   root.className = mount ? 'vr-form vr-inline' : 'vr-form';
   if (!mount) root.id = 'vr-modal';
@@ -1565,11 +1568,15 @@ window.fitReserve = function (mount) {
 <div class="vr-box">
 <h2>${LBL}</h2>
 <p class="vr-sub">원활하고 빠른 상담을 위해 정보를 남겨주세요.</p>
+<div class="vr-row">
 <div class="vr-field"><div class="vr-label">이름</div><input type="text" id="vr-name" placeholder="이름입력" autocomplete="name"></div>
 <div class="vr-field"><div class="vr-label">연락처</div><div class="vr-phone"><select id="vr-phone-sel">${phoneOptions}</select><span class="vr-dash">-</span><input type="tel" id="vr-phone-mid" maxlength="4" inputmode="numeric" autocomplete="off"><span class="vr-dash">-</span><input type="tel" id="vr-phone-last" maxlength="4" inputmode="numeric" autocomplete="off"></div></div>
-<div class="vr-field"><div class="vr-label">방문일자</div><input type="date" id="vr-date"></div>
-<div class="vr-hint">※날짜 입력을 위해 우측 달력 아이콘을 클릭해 주세요</div>
-<div class="vr-field"><div class="vr-label">방문시간</div><select id="vr-time">${timeOptions}</select></div>
+</div>
+<div class="vr-row">
+<div class="vr-cell"><div class="vr-field"><div class="vr-label">방문일자</div><input type="date" id="vr-date"></div>
+<div class="vr-hint">※날짜 입력을 위해 우측 달력 아이콘을 클릭해 주세요</div></div>
+<div class="vr-cell"><div class="vr-field"><div class="vr-label">방문시간</div><select id="vr-time">${timeOptions}</select></div></div>
+</div>
 <div class="vr-policy-head" id="vr-policy-toggle"><span>개인정보 수집 동의 <span style="color:#e53935">*</span></span>
 <svg class="vr-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
 <div class="vr-policy" id="vr-policy">${PRIVACY_TEXT}</div>
