@@ -106,10 +106,21 @@
 // wcs_add 와 _nasa 는 스크립트를 붙이기 전에 먼저 채웁니다. 원본보다 이른 시점인데,
 // 이르면 이를수록 안전하고(wcslog 가 로드 중에 읽더라도 이미 있음) 콘솔 점검을
 // 네트워크가 느린 날에도 통과합니다.
+/* ===== itzip-head-4-naver.js ===== */
 (function () {
   window.wcs_add = window.wcs_add || {};
   window.wcs_add['wa'] = 's_4d7836409a97';
   window._nasa = window._nasa || {};
+
+  // 랜딩 시점 URL을 즉시 동결. React 라우팅/reload 이전에 확보해야 함.
+  var LANDING = location.href;
+  try {
+    if (/[?&]n_|NaPm=/.test(location.search)) {
+      sessionStorage.setItem('naLanding', LANDING);
+    }
+    var saved = sessionStorage.getItem('naLanding');
+    if (saved) LANDING = saved;
+  } catch (e) {}
 
   var s = document.createElement('script');
   s.type = 'text/javascript';
@@ -118,9 +129,19 @@
   s.onload = function () {
     try {
       if (!window.wcs) return;
-      window.wcs.inflow();
+      var cur = location.href;
+      if (LANDING && LANDING !== cur) {
+        // inflow 가 읽는 건 location.search 라, 잠깐 되돌린 뒤 복구합니다.
+        history.replaceState(null, '', LANDING);
+        window.wcs.inflow();
+        history.replaceState(null, '', cur);
+      } else {
+        window.wcs.inflow();
+      }
       window.wcs_do();
-    } catch (e) {}
+    } catch (e) {
+      try { window.wcs.inflow(); window.wcs_do(); } catch (e2) {}
+    }
   };
   (document.head || document.documentElement).appendChild(s);
 })();
