@@ -822,9 +822,12 @@ window.FIT_BRAND = {
   }
   var FIT_RESERVE_LABEL= '\ubc29\ubb38 \uc608\uc57d';        // visit reservation
   // \uc0c1\ub2f4 \ubc84\ud2bc\uc740 "\uc0c1\ub2f4 \ubb38\uc758" \ub300\uc2e0 \uadf8 \ud604\uc7a5\uc758 \ub300\ud45c\ubc88\ud638\ub97c \ub2f5\ub2c8\ub2e4. \uc67c\ucabd \uc218\ud654\uae30\ub294 fill \uc774
-  // currentColor \ub77c \ubc84\ud2bc \uc0c9\uc774 \ub4a4\uc9d1\ud600\ub3c4(paintBtn) \uae00\uc790\uc640 \uac19\uc774 \ub530\ub77c\uc635\ub2c8\ub2e4. viewBox \ub9cc
-  // \ub450\uace0 width/height \ub97c \uc548 \uc4f4 \uac83\uc740 1em \ub85c \uc790\ub77c\uc11c \uae00\uc790 \ud06c\uae30\uc5d0 \ub9de\ucd94\ub77c\ub294 \ub73b\uc785\ub2c8\ub2e4.
-  var TEL_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1.05em;height:1.05em;flex:0 0 auto;display:block"><path d="M6.6 10.8a15.1 15.1 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.2.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11 21 3 13 3 3c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .8-.2 1l-2.3 2.2z"/></svg>';
+  // currentColor \ub77c \ubc84\ud2bc \uc0c9\uc774 \ub4a4\uc9d1\ud600\ub3c4(paintBtn) \uae00\uc790\uc640 \uac19\uc774 \ub530\ub77c\uc635\ub2c8\ub2e4. width/height \ub97c
+  // px \uc774 \uc544\ub2c8\ub77c em \uc73c\ub85c \uc900 \uac83\uc740 \uae00\uc790 \ud06c\uae30\uc5d0 \ub9de\ucdb0 \uac19\uc774 \uc790\ub77c\ub77c\ub294 \ub73b\uc785\ub2c8\ub2e4.
+  // \uc218\ud654\uae30 \uac00\uc6b4\ub370 \uc190\uc7a1\uc774\ub294 \uc77c\ubd80\ub7ec \uad75\uac8c \uadf8\ub838\uc2b5\ub2c8\ub2e4. \ud754\ud55c Material call \uc544\uc774\ucf58\uc740 \uc774 \ubd80\ubd84\uc774
+  // 15px \ub85c \uc904\uba74 \uc2e4\ucc98\ub7fc \uc587\uc544\uc838\uc11c \ubb34\uc2a8 \uadf8\ub9bc\uc778\uc9c0 \uc548 \ubcf4\uc785\ub2c8\ub2e4. \uc88c\ud45c\ub294 24 \uac00 \uc544\ub2c8\ub77c 16 \uce78
+  // \uae30\uc900\uc774\ub77c(viewBox) \uac19\uc740 em \uc5d0\uc11c \uadf8\ub9bc\uc774 \uc870\uae08 \ub354 \ud06c\uac8c \ucc39\ub2c8\ub2e4.
+  var TEL_SVG = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style="width:1.05em;height:1.05em;flex:0 0 auto;display:block"><path d="M3.9 1.1a1.2 1.2 0 0 0-1.8-.1L1 2.1C.2 2.9 0 4.1.4 5.1a19 19 0 0 0 4.4 6.6 19 19 0 0 0 6.1 4.1c1 .4 2.2.2 3-.6l1.1-1.1a1.2 1.2 0 0 0-.1-1.8l-2.5-1.9c-.4-.3-1-.4-1.5-.3l-1.8.5c-.4.1-.9 0-1.2-.3L5.6 7.1c-.3-.3-.4-.8-.3-1.2l.5-1.8c.1-.5 0-1.1-.3-1.5L3.9 1.1z"/></svg>';
 
   // Everything scoped inside .productDetailPage keys off that element alone, NOT off
   // body.fit-landing. The body class is only set from inside landingTidy, so hanging the
