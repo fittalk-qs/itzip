@@ -390,14 +390,49 @@ window.FIT_BRAND = {
     excludeSrc: ['banner', 'bnDress', 'youtube', 'ads', 'pay', 'checkout']  // secondary safety net
   };
 
-  var seen = new WeakMap();         // iframe -> last applied height
+  var seen = new WeakMap();         // iframe -> last applied height and ratio
 
   function isExcluded(fr) {
-    var s = ((fr.getAttribute('src') || '') + ' ' + (fr.id || '') + ' ' + (fr.className || '')).toLowerCase();
+    var s = ((fr.getAttribute('src') || 0) + ' ' + (fr.id || 0) + ' ' + (fr.className || 0)).toLowerCase();
     for (var i = 0; i < CFG.excludeSrc.length; i++) {
       if (s.indexOf(CFG.excludeSrc[i].toLowerCase()) !== -1) return true;
     }
     return false;
+  }
+
+  // Qshop draws the whole page as one canvas and scales it: --site-ratio is the factor.
+  // There are two canvases - desktop is drawn at 1280px, mobile at 374px - and whichever
+  // applies gets stretched to fill the window. A 1024 tablet is the desktop canvas at 0.8,
+  // a 768 tablet is the MOBILE canvas blown up to 2.05. Section heights, fonts and images
+  // all follow that factor. A code widget is the only thing that does not, because it
+  // lives in an iframe with its own viewport: at 0.8 it draws too big and covers the next
+  // section, at 2.05 it draws a phone-sized widget in a section built for 2x and leaves a
+  // screen of white space. Same bug, both directions.
+  function siteRatio() {
+    var v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--site-ratio'));
+    return (v > 0.05 && v < 20) ? v : 1;
+  }
+
+  function plain(R) { return Math.abs(R - 1) < 0.02; }
+
+  // Lay the widget out at the width its canvas was drawn at, then scale the result -
+  // exactly what Qshop does with everything else on the page.
+  function applyScale(fr, R) {
+    if (plain(R)) {
+      if (fr.style.transform) {
+        fr.style.removeProperty('width');
+        fr.style.removeProperty('transform');
+        fr.style.removeProperty('transform-origin');
+        fr.style.removeProperty('flex-shrink');
+      }
+      return;
+    }
+    var want = 'scale(' + R + ')';
+    if (fr.style.transform === want) return;
+    fr.style.flexShrink = '0';   // the iframe is a flex item: without this it shrinks straight back
+    fr.style.width = (100 / R) + '%';
+    fr.style.transformOrigin = 'top left';
+    fr.style.transform = want;
   }
 
   function innerHeight(doc) {
@@ -442,11 +477,8 @@ window.FIT_BRAND = {
     return null;
   }
 
-  // A Qshop section is a fixed grid canvas whose cell size scales with the window width,
-  // so every widget gets a slot of a set height and the height shrinks on narrow screens.
-  // A widget that needs more room than its slot does not push anything down - it simply
-  // paints over the section below (worst on tablets, where the canvas is small but the
-  // widget has already switched to its tall mobile layout). Grow the section by whatever
+  // Last line of defence. A widget that still needs more room than its slot does not push
+  // anything down - it just paints over the section below. Grow the section by whatever
   // hangs out the bottom so the page stays stacked instead of overlapping.
   function guard(fr) {
     var slot = codeSlot(fr);
@@ -473,16 +505,24 @@ window.FIT_BRAND = {
     try { doc = fr.contentDocument; } catch (e) { return; }   // cross-origin -> skip
     if (!doc || !doc.body) return;
 
+    var R = siteRatio();
+    applyScale(fr, R);          // width first, so the height below is measured on it
+
     var h = measure(doc);
     if (h <= 0) return;
 
-    if (seen.get(fr) !== h) {
-      seen.set(fr, h);
+    var key = h + 'x' + R;
+    if (seen.get(fr) !== key) {
+      seen.set(fr, key);
 
       fr.style.height = h + 'px';
       fr.style.minHeight = '0';
       fr.style.maxHeight = 'none';
       fr.style.overflow = 'hidden';
+      // scale() is paint only - the box still takes h px of the page, so hand the rest
+      // over (or give it back, when R is below 1) through the margin.
+      if (plain(R)) fr.style.removeProperty('margin-bottom');
+      else fr.style.marginBottom = Math.round(h * (R - 1)) + 'px';
       fr.setAttribute('scrolling', 'no');
       try { doc.documentElement.style.overflow = 'hidden'; doc.body.style.overflow = 'hidden'; } catch (e) {}
 
@@ -529,7 +569,7 @@ window.FIT_BRAND = {
 
   function watch(fr) {
     if (seen.has(fr)) return;
-    seen.set(fr, -1);
+    seen.set(fr, 0);
     fr.addEventListener('load', function () { hook(fr); fit(fr); });
     hook(fr); fit(fr);
   }
