@@ -408,25 +408,88 @@ window.FIT_BRAND = {
     );
   }
 
+  // scrollHeight ratchets: once we made the iframe tall, the document inside can never
+  // report anything smaller, so a widget that becomes shorter (window widened, cards back
+  // on one row) would keep the old height forever. Where the bottom of the last child is
+  // clearly higher than that, trust the children instead - that number can go down.
+  function contentHeight(doc) {
+    var b = doc.body, win = doc.defaultView;
+    if (!b || !win) return 0;
+    var top = b.getBoundingClientRect().top, max = 0, kids = b.children;
+    for (var i = 0; i < kids.length; i++) {
+      var c = kids[i], tag = c.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'LINK') continue;
+      var cs = win.getComputedStyle(c);
+      if (cs.display === 'none' || cs.position === 'fixed') continue;
+      var bottom = c.getBoundingClientRect().bottom - top + (parseFloat(cs.marginBottom) || 0);
+      if (bottom > max) max = bottom;
+    }
+    if (max <= 0) return 0;
+    return Math.round(max + (parseFloat(win.getComputedStyle(b).paddingBottom) || 0));
+  }
+
+  function measure(doc) {
+    var h = innerHeight(doc), c = contentHeight(doc);
+    return (c > 0 && c < h - 8) ? c : h;   // only the shrink direction needs the child walk
+  }
+
+  function codeSlot(fr) {
+    var el = fr.parentNode, hops = 0;
+    while (el && el.nodeType === 1 && hops < 6) {
+      if (el.getAttribute && el.getAttribute('data-type') === 'code') return el;
+      el = el.parentNode; hops++;
+    }
+    return null;
+  }
+
+  // A Qshop section is a fixed grid canvas whose cell size scales with the window width,
+  // so every widget gets a slot of a set height and the height shrinks on narrow screens.
+  // A widget that needs more room than its slot does not push anything down - it simply
+  // paints over the section below (worst on tablets, where the canvas is small but the
+  // widget has already switched to its tall mobile layout). Grow the section by whatever
+  // hangs out the bottom so the page stays stacked instead of overlapping.
+  function guard(fr) {
+    var slot = codeSlot(fr);
+    if (!slot) return;
+    var grid = slot.parentNode;
+    if (!grid || grid.nodeType !== 1 || !window.getComputedStyle) return;
+    var gcs = window.getComputedStyle(grid);
+    if (gcs.display.indexOf('grid') === -1) return;
+
+    if (grid.__ftPad === undefined) grid.__ftPad = parseFloat(gcs.paddingBottom) || 0;
+    grid.style.paddingBottom = grid.__ftPad + 'px';      // measure without our own padding
+
+    var bottom = grid.getBoundingClientRect().bottom, over = 0, kids = grid.children;
+    for (var i = 0; i < kids.length; i++) {
+      var d = kids[i].getBoundingClientRect().bottom - bottom;
+      if (d > over) over = d;
+    }
+    if (over > 1) grid.style.paddingBottom = (grid.__ftPad + Math.ceil(over)) + 'px';
+  }
+
   function fit(fr) {
     if (isExcluded(fr)) return;
     var doc;
     try { doc = fr.contentDocument; } catch (e) { return; }   // cross-origin -> skip
     if (!doc || !doc.body) return;
 
-    var h = innerHeight(doc);
+    var h = measure(doc);
     if (h <= 0) return;
-    if (seen.get(fr) === h) return;
-    seen.set(fr, h);
 
-    fr.style.height = h + 'px';
-    fr.style.minHeight = '0';
-    fr.style.maxHeight = 'none';
-    fr.style.overflow = 'hidden';
-    fr.setAttribute('scrolling', 'no');
-    try { doc.documentElement.style.overflow = 'hidden'; doc.body.style.overflow = 'hidden'; } catch (e) {}
+    if (seen.get(fr) !== h) {
+      seen.set(fr, h);
 
-    unlockChain(fr);   // release fixed height so the grid row grows and pushes siblings down
+      fr.style.height = h + 'px';
+      fr.style.minHeight = '0';
+      fr.style.maxHeight = 'none';
+      fr.style.overflow = 'hidden';
+      fr.setAttribute('scrolling', 'no');
+      try { doc.documentElement.style.overflow = 'hidden'; doc.body.style.overflow = 'hidden'; } catch (e) {}
+
+      unlockChain(fr);   // release fixed height so the grid row grows and pushes siblings down
+    }
+
+    guard(fr);           // the slot itself never grows, so give the section room for the spill
   }
 
   function unlockChain(fr) {
@@ -496,6 +559,7 @@ window.FIT_BRAND = {
         list[i].style.height = d.height + 'px';
         list[i].style.overflow = 'hidden';
         list[i].setAttribute('scrolling', 'no');
+        guard(list[i]);
         break;
       }
     }
