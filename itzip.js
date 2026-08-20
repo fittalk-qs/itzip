@@ -820,8 +820,11 @@ window.FIT_BRAND = {
   function curTel(){
     return (window.FIT_SITE ? window.FIT_SITE.tel() : '') || (window.FIT_BRAND || {}).tel || '1668-1561';
   }
-  var FIT_CTA_LABEL    = '\uc0c1\ub2f4 \ubb38\uc758';        // consult inquiry
   var FIT_RESERVE_LABEL= '\ubc29\ubb38 \uc608\uc57d';        // visit reservation
+  // \uc0c1\ub2f4 \ubc84\ud2bc\uc740 "\uc0c1\ub2f4 \ubb38\uc758" \ub300\uc2e0 \uadf8 \ud604\uc7a5\uc758 \ub300\ud45c\ubc88\ud638\ub97c \ub2f5\ub2c8\ub2e4. \uc67c\ucabd \uc218\ud654\uae30\ub294 fill \uc774
+  // currentColor \ub77c \ubc84\ud2bc \uc0c9\uc774 \ub4a4\uc9d1\ud600\ub3c4(paintBtn) \uae00\uc790\uc640 \uac19\uc774 \ub530\ub77c\uc635\ub2c8\ub2e4. viewBox \ub9cc
+  // \ub450\uace0 width/height \ub97c \uc548 \uc4f4 \uac83\uc740 1em \ub85c \uc790\ub77c\uc11c \uae00\uc790 \ud06c\uae30\uc5d0 \ub9de\ucd94\ub77c\ub294 \ub73b\uc785\ub2c8\ub2e4.
+  var TEL_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:1.05em;height:1.05em;flex:0 0 auto;display:block"><path d="M6.6 10.8a15.1 15.1 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.2.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11 21 3 13 3 3c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.4 0 .8-.2 1l-2.3 2.2z"/></svg>';
 
   // Everything scoped inside .productDetailPage keys off that element alone, NOT off
   // body.fit-landing. The body class is only set from inside landingTidy, so hanging the
@@ -920,13 +923,34 @@ window.FIT_BRAND = {
     P(el, 'background-color', filled ? '#3700ff' : '#ffffff');
     P(el, 'color', filled ? '#ffffff' : '#3700ff');
   }
+  // 수화기와 번호를 한 줄에 세웁니다. 모바일 하단 바에서는 버튼이 flex:1 로 늘어나므로
+  // text-align 이 아니라 justify-content 가 가운데 정렬을 맡습니다.
+  function consultBox(el){
+    P(el, 'display', 'inline-flex');
+    P(el, 'align-items', 'center');
+    P(el, 'justify-content', 'center');
+    P(el, 'gap', '7px');
+  }
+  // 번호는 현장마다 다르고 상세 HTML 이 늦게 도착하므로 매 tick 다시 씁니다. 지금 보이는
+  // 것이 이미 그 번호면 그냥 돌아섭니다. 표시 자체를 보고 판정하는 것이라(예전의
+  // textContent 비교와 같은 성질) 큐샵이 자기 버튼을 다시 그려 놓아도 다음 tick 에
+  // 저절로 되돌아옵니다.
+  // 아이콘은 우리가 쓴 문자열뿐이고, 시트에서 온 번호는 textContent 로만 넣습니다.
+  function setConsult(el, tel){
+    if (el.textContent === tel && el.querySelector('svg')) return;
+    el.innerHTML = TEL_SVG;
+    var s = document.createElement('span');
+    s.textContent = tel;
+    el.appendChild(s);
+  }
   function mkBtn(kind){
     var filled = (kind === 'reserve');
     var el = document.createElement(kind === 'consult' ? 'a' : 'button');
-    el.textContent = (kind === 'reserve') ? FIT_RESERVE_LABEL : FIT_CTA_LABEL;
     applyBtnBox(el);
     P(el, 'transition', 'background-color .15s ease,color .15s ease');
     paintBtn(el, filled);
+    if (kind === 'reserve') el.textContent = FIT_RESERVE_LABEL;
+    else { consultBox(el); setConsult(el, curTel()); }
     if (kind === 'consult'){ el.className = 'fit-consult'; el.href = 'tel:' + curTel(); }
     else { el.type = 'button'; el.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); openReserve(); }); }
     el.addEventListener('mouseenter', function () { paintBtn(el, !filled); });
@@ -1002,11 +1026,13 @@ window.FIT_BRAND = {
   function dressBarConsult(cta){
     cta.removeAttribute('disabled');
     var lbl = cta.querySelector('p') || cta;
-    if (lbl.textContent !== FIT_CTA_LABEL) lbl.textContent = FIT_CTA_LABEL;
+    setConsult(lbl, curTel());
     var filled = isHover(cta);
     applyBtnBox(cta);
+    consultBox(cta);   // applyBtnBox 의 inline-block 을 덮어야 하므로 반드시 뒤에
     paintBtn(cta, filled);
     if (lbl && lbl !== cta){
+      consultBox(lbl);
       P(lbl, 'color', filled ? '#ffffff' : '#3700ff');
       P(lbl, 'white-space', 'nowrap');
       P(lbl, 'margin', '0');
@@ -1149,10 +1175,12 @@ window.FIT_BRAND = {
     }
     // Re-point the consult links every tick. The marker lives in the detail HTML, which
     // can arrive after the buttons were built, so this is what makes the number stick.
-    var want = 'tel:' + curTel();
+    // 이제 글자도 번호라서 href 와 함께 표시도 다시 씁니다.
+    var tel = curTel(), want = 'tel:' + tel;
     var links = document.querySelectorAll('a.fit-consult');
     for (var li = 0; li < links.length; li++){
       if (links[li].getAttribute('href') !== want) links[li].setAttribute('href', want);
+      setConsult(links[li], tel);
     }
     return true;
   }
