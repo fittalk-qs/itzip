@@ -45,15 +45,15 @@
 .izv-t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:10px 2px 0;font-size:14px;font-weight:700;line-height:1.35;color:#1b2340}
 .izv-t:empty{display:none}
 
-/* 오버레이 재생창. 영상 위 클릭은 iframe 이 먹으므로 바깥이나 X 만 닫힘.
-   크기는 폭이 정하고 높이는 비율이 따라옵니다. max-width 의 세 번째 값이 화면 높이로 거는
-   상한입니다. 이게 없으면 낮은 창에서 아래가 잘리고, 반대로 height 를 100% 로 채우면 폭
-   상한에 걸린 순간 비율이 깨져 플레이어에 검은 띠가 생깁니다. 64px = 위아래 여백 44 + 20. */
-.izv-lb{position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:44px 20px 20px}
-.izv-lb>div{position:relative;width:100%;aspect-ratio:16/9;max-width:min(100%,940px,calc((100vh - 64px)*1.778))}
-.izv-p>div{aspect-ratio:9/16;max-width:min(100%,420px,calc((100vh - 64px)*.5625))}
-.izv-lb iframe{display:block;width:100%;height:100%;border:0;border-radius:12px;background:#000}
-.izv-lb b{position:absolute;top:-34px;right:0;color:#fff;font:400 28px/1 sans-serif;cursor:pointer}
+/* 제자리 재생. 카드를 누르면 포스터 위에 iframe 을 덮습니다. 상자(.izv-b)가 이미 비율과
+   둥근 모서리(overflow:hidden)를 들고 있으므로 iframe 은 그 안을 꽉 채우기만 하면 됩니다.
+   그래서 폭·높이 계산도, 화면 높이 상한도 필요 없습니다. 카드가 곧 플레이어 크기입니다.
+   top/left 로 까는 이유는 위 img 와 같습니다. 부모 높이가 aspect-ratio 로 만들어진 값이라
+   height:100% 의 기준이 안 잡히는 것을 absolute 로 피해 갑니다.
+   재생 중(.on)에는 재생버튼(:before/:after)과 길이 배지(i)를 감춥니다. 영상 위에 그대로
+   남으면 가짜 버튼처럼 보이는 데다 클릭은 iframe 이 먹어서 눌러도 아무 일이 없습니다. */
+.izv-b iframe{position:absolute;top:0;left:0;z-index:4;width:100%;height:100%;border:0;display:block}
+.izv-b.on:before,.izv-b.on:after,.izv-b.on i{display:none}
 
 /* ===== itzip-6-cta.css ===== */
 /* 상세설명(현장 페이지) 본문 사이에 끼워 넣는 방문예약 배너.

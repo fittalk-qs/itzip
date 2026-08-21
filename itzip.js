@@ -1347,29 +1347,39 @@ window.FIT_BRAND = {
       if (!asked[id]) { asked[id] = 1; fresh.push(id); }
       post(id, function (s, t) {
         g.className = 'media ' + (t ? 'izv-s' : 'izv-l');
-        g.innerHTML = '<a class=izv' + (t ? ' data-p=1' : '') + '><span class=izv-b>' +
+        g.innerHTML = '<a class=izv><span class=izv-b>' +
           (s ? '<img loading=lazy alt="" src="' + s + '">' : '') + '</span><span class=izv-t></span></a>';
         rows(); paint();
       });
     });
     if (fresh.length) pull(fresh);
   }
-  // 클릭하면 유튜브로 나가지 않고 이 자리에서 오버레이로 엽니다. 오버레이를 지우는 것이
-  // 곧 재생 중지입니다. iframe 이 사라지기 때문입니다.
+  // 클릭하면 유튜브로 나가지도, 덮는 창을 띄우지도 않고 그 카드 자리에서 바로 재생합니다.
+  // 포스터(img)와 배지(i)는 지우지 않고 그 위에 iframe 을 덮기만 합니다. 되돌릴 때 iframe
+  // 하나만 걷어내면 원래 카드가 그대로 돌아오고, iframe 이 사라지는 것이 곧 재생 중지입니다.
+  // 크기는 카드가 정합니다. 가로형은 860 안의 16:9, 숏츠는 반 폭의 9:16 그대로 플레이어가
+  // 됩니다. 눌린 자리에서 커지지 않으므로 글 읽던 위치도 밀리지 않습니다.
   document.addEventListener('click', function (e) {
-    var a = e.target && e.target.closest && e.target.closest('.izv');
+    var a = e.target && e.target.closest && e.target.closest('.izv'), b, id;
     if (!a) return;
     e.preventDefault();
-    var b = document.createElement('div');
-    b.className = 'izv-lb' + (a.getAttribute('data-p') ? ' izv-p' : '');
-    b.innerHTML = '<div><b>×</b><iframe allowfullscreen allow="autoplay; encrypted-media" src="https://www.youtube.com/embed/' +
-      a.parentNode.getAttribute('data-izv') + '?autoplay=1&playsinline=1&rel=0"></iframe></div>';
-    function x() { if (b.parentNode) b.parentNode.removeChild(b); document.removeEventListener('keydown', k); }
-    function k(e) { if (e.keyCode == 27) x(); }
-    b.onclick = x;
-    document.addEventListener('keydown', k);
-    document.body.appendChild(b);
+    b = a.querySelector('.izv-b');
+    id = a.parentNode.getAttribute('data-izv');
+    if (!b || !id || b.querySelector('iframe')) return;   // 재생 중인 카드를 또 누른 것
+    stop();
+    b.className = 'izv-b on';
+    b.insertAdjacentHTML('beforeend', '<iframe allowfullscreen allow="autoplay; encrypted-media" src="https://www.youtube.com/embed/' +
+      id + '?autoplay=1&playsinline=1&rel=0"></iframe>');
   }, true);
+  // 새 영상을 누르면 먼저 틀어 둔 것을 썸네일로 되돌립니다. 소리가 겹치지 않게 하려는 것이고,
+  // 한 화면에 재생 중인 플레이어가 둘 이상 서 있지 않게 하려는 것이기도 합니다.
+  function stop() {
+    [].forEach.call(Q('.izv-b.on'), function (b) {
+      var f = b.querySelector('iframe');
+      if (f) b.removeChild(f);
+      b.className = 'izv-b';
+    });
+  }
   // 상세설명은 큐샵이 나중에 그려 넣으므로 한 번만 훑으면 놓칩니다. 변경을 다음 프레임
   // 한 번으로 모아서 처리합니다.
   var q = 0;
