@@ -1799,6 +1799,16 @@ window.fitReserve = function (mount) {
   //   [슬라이드끝]                       여기까지
   //   <!--슬라이드시작--> <!--슬라이드끝-->
   //
+  // 모양은 이름 뒤에 막대(|)로 이어 붙입니다. 상품마다 다르게 하려는 것이라 공통 css 가
+  // 아니라 이 표시 한 줄에 담습니다. 에디터는 style 태그를 지우지만 글은 남기니까요.
+  //   [슬라이드시작:59A,59B|색=#3700ff|배치=줄바꿈|화살표=항상]
+  //   색 글자 탭배경 탭글자 테두리 화살표색   색 이름이나 #코드
+  //   크기 모서리 간격 창모서리 화살표크기     숫자(px)
+  //   여백                                   '세로 가로' 두 숫자. 보기: 여백=9 17
+  //   배치      반응형(기본) | 줄바꿈 | 스크롤
+  //   화살표    pc(기본) | 항상 | 없음
+  // 안 적은 것은 기본값 그대로입니다. 오타는 조용히 무시합니다.
+  //
   // 한 페이지에 여러 벌을 넣어도 됩니다. 시작과 끝을 짝지어 순서대로 다 만듭니다. 짝이 안
   // 맞는 표시(끝이 없는 시작, 시작이 없는 끝)는 그냥 무시합니다.
   //
@@ -1837,6 +1847,39 @@ window.fitReserve = function (mount) {
     var a = (s || '').split(/[,\uFF0C]/), r = [], i, v;
     for (i = 0; i < a.length; i++) { v = a[i].replace(/^[\s\]]+|[\s\]]+$/g, ''); if (v) r.push(v); }
     return r;
+  }
+  // 이름 뒤 막대(|)로 이어 붙인 설정을 뽑습니다.
+  function opts(s) {
+    var a = String(s || '').split('|'), o = {}, i, m;
+    for (i = 1; i < a.length; i++) {
+      m = /^\s*([^=]+?)\s*=\s*(.+?)\s*$/.exec(a[i]);
+      if (m) o[m[1]] = m[2];
+    }
+    return o;
+  }
+  // 값은 에디터에서 온 남의 글자입니다. setProperty 는 이상한 값을 그냥 버리므로 css 가
+  // 깨질 일은 없지만, 미리 걸러 두면 오타 때문에 엉뚱한 모양이 되는 일이 없습니다.
+  var COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,%\s]+\)|[a-z]{3,20})$/i;
+  var TINT = { '색': '--izs-on-bg', '글자': '--izs-on-fg', '탭배경': '--izs-off-bg', '탭글자': '--izs-off-fg', '테두리': '--izs-off-line' };
+  var SPAN = { '크기': ['--izs-tab-size', 8, 30], '모서리': ['--izs-tab-round', 0, 999], '간격': ['--izs-gap', 0, 40], '창모서리': ['--izs-round', 0, 60], '화살표크기': ['--izs-arrow-size', 20, 90] };
+  function num(v, lo, hi) { var n = parseFloat(v); return isNaN(n) ? null : Math.max(lo, Math.min(hi, n)) + 'px'; }
+  // 설정을 슬라이더 상자에 입힙니다. 인라인이라 공통 css 의 기본값을 확실히 덮어씁니다.
+  function dress(box, o) {
+    var k, v;
+    for (k in TINT) if (o[k] && COLOR.test(o[k])) box.style.setProperty(TINT[k], o[k]);
+    if (o['화살표색'] && COLOR.test(o['화살표색'])) {
+      box.style.setProperty('--izs-arrow', o['화살표색']);
+      box.style.setProperty('--izs-arrow-on', o['화살표색']);
+    }
+    for (k in SPAN) if (o[k] && (v = num(o[k], SPAN[k][1], SPAN[k][2]))) box.style.setProperty(SPAN[k][0], v);
+    v = o['여백'];                                   // '세로 가로' 순서입니다
+    if (v && /^\d+\s+\d+$/.test(v)) box.style.setProperty('--izs-tab-pad', v.replace(/(\d+)\s+(\d+)/, '$1px $2px'));
+    v = o['배치'];
+    if (v === '줄바꿈') box.className += ' izs-wrap';
+    else if (v === '스크롤' || v === '가로스크롤') box.className += ' izs-roll';
+    v = o['화살표'];
+    if (v === '항상') box.className += ' izs-arw';
+    else if (v === '없음' || v === '안함' || v === '끔') box.className += ' izs-noarw';
   }
   // 본문 맨 위에서 아래로 훑으며 표시를 순서대로 모읍니다. 글로 쓴 것과 주석을 한 줄에 놓고
   // 보아야 여러 벌의 짝을 제대로 지을 수 있어서 한 번에 훑습니다.
@@ -1921,7 +1964,7 @@ window.fitReserve = function (mount) {
   }
   // 이름은 에디터에서 온 남의 글자라 textContent 로만 넣습니다. 주소는 이미 페이지에 있던
   // 이미지의 것을 src 로 직접 옮깁니다. innerHTML 로 문자열을 이어 붙이지 않습니다.
-  function build(nm, rows, list) {
+  function build(nm, op, rows, list) {
     var b, one = [], many = [], i, im, t, j, box, tabs, view, track, prev, next, cur = 0, bt = [];
     for (i = 0; i < list.length; i++) {
       if (!list[i]) continue;
@@ -1943,6 +1986,7 @@ window.fitReserve = function (mount) {
     for (i = 0; i < rows.length; i++) if (!rows[i].parentNode || rows[i].getAttribute('data-izs')) return 0;
     if (nm.length !== b.length) nm = null;       // 개수가 안 맞으면 이름 대신 번호
     box = document.createElement('div'); box.className = 'izs';
+    dress(box, op);
     tabs = document.createElement('div'); tabs.className = 'izs-tabs';
     view = document.createElement('div'); view.className = 'izs-view';
     track = document.createElement('div'); track.className = 'izs-track';
@@ -2048,7 +2092,8 @@ window.fitReserve = function (mount) {
       ready(ims[k], function (im) {
         list[k] = im ? { im: im, cuts: cuts(im) } : null;
         if (--left) return;
-        if (!build(names(a.s), rows, list)) return;   // 못 만들면 지금 모습 그대로 둡니다
+        // 이름은 막대(|) 앞까지만입니다. 뒤쪽은 모양 설정입니다.
+        if (!build(names(String(a.s).split('|')[0]), opts(a.s), rows, list)) return;
         drop(a.at); drop(z.at);
       });
     }

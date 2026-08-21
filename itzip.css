@@ -144,40 +144,63 @@
 /* 본문 한 구간을 좌우로 넘기게 만든 슬라이더. 구조는 itzip-7-slide.js 가 만듭니다.
 
      div.izs
-       div.izs-tabs        이름(또는 번호) 알약들. 넘치면 가로로 밀어서 봅니다
+       div.izs-tabs        이름(또는 번호) 알약들
          button(.on)
        div.izs-view        보이는 창. 높이는 고른 장에 맞춰 인라인으로 들어갑니다
          div.izs-track     슬라이드를 옆으로 늘어놓고 translateX 로 밉니다
            div.izs-s       한 장. 높이가 저마다 달라 인라인 padding-bottom 으로 받습니다
              img           원본 이미지. 위로 끌어올려 자기 구간만 보입니다
-         b.izs-a           좌우 화살표 (PC 만)
+         b.izs-a           좌우 화살표
 
    왜 이미지를 잘라 새로 만들지 않고 밀어 올리나: 타입 이미지는 여러 장이 세로로 이어 붙은
-   한 장으로 옵니다. canvas 로 잘라 새 이미지를 만들면 같은 그림을 두 벌 들게 되고(7429px
-   짜리라 메모리가 큽니다) 화면 폭이 바뀔 때마다 다시 그려야 합니다. 같은 원본을 여러
-   슬라이드가 나눠 쓰고 보이는 구간만 다르게 하면 이미 받아 둔 그림 한 장으로 끝납니다.
+   한 장으로 오기도 합니다. canvas 로 잘라 새 이미지를 만들면 같은 그림을 두 벌 들게 되고
+   (7429px 짜리라 메모리가 큽니다) 화면 폭이 바뀔 때마다 다시 그려야 합니다. 같은 원본을
+   여러 슬라이드가 나눠 쓰고 보이는 구간만 다르게 하면 이미 받아 둔 그림 한 장으로 끝납니다.
 
    크기는 전부 퍼센트라서 창 크기가 바뀌어도 JS 가 다시 계산할 일이 없습니다.
      .izs-s 의 padding-bottom = 그 장 높이 / 원본 폭      (퍼센트 padding 은 폭 기준)
      img 의 translateY        = -그 장 시작 y / 원본 높이 (퍼센트 translate 는 제 높이 기준)
    이 계산은 이미지가 상자 폭을 정확히 100% 채운다는 전제 위에 섭니다. 아래 img 규칙이
    그것을 보장합니다. */
-.izs{max-width:860px;margin:24px auto;text-align:left}
+
+/* 색과 크기는 전부 여기 변수로 모아 두었습니다. 모양을 바꾸려면 이 파일을 헤집지 말고
+   맨 아래에 .izs{--izs-on-bg:#3700ff} 처럼 덮어쓰는 뭉치만 붙이면 됩니다.
+   슬라이드메이커(로컬 html)가 그 뭉치를 만들어 줍니다. */
+.izs{
+  --izs-on-bg:#1b2340;               /* 고른 탭 배경 */
+  --izs-on-fg:#fff;                  /* 고른 탭 글자 */
+  --izs-off-bg:#fff;                 /* 보통 탭 배경 */
+  --izs-off-fg:#5a6178;              /* 보통 탭 글자 */
+  --izs-off-line:#dfe3ee;            /* 보통 탭 테두리 */
+  --izs-tab-pad:9px 17px;            /* 탭 안쪽 여백 */
+  --izs-tab-size:14px;               /* 탭 글자 크기 */
+  --izs-tab-round:999px;             /* 탭 모서리. 999 면 알약, 8 이면 사각 */
+  --izs-gap:6px;                     /* 탭 사이 간격 */
+  --izs-round:12px;                  /* 창 모서리 */
+  --izs-arrow:rgba(27,35,64,.5);     /* 화살표 동그라미 */
+  --izs-arrow-on:rgba(27,35,64,.75); /* 화살표 동그라미(마우스 올렸을 때) */
+  --izs-arrow-size:38px;             /* 화살표 지름 */
+  max-width:860px;margin:24px auto;text-align:left
+}
 
 /* 알약 탭. 가운데로 모으되 넘치면 가로로 밉니다. 스크롤 막대는 감춥니다.
    justify-content 를 두 번 쓰는 것은 오타가 아닙니다. 그냥 center 로 두면 탭이 상자보다
    길어졌을 때 왼쪽으로 넘친 부분이 스크롤로도 닿지 않습니다(첫 탭이 잘려서 안 나옵니다).
    safe center 는 넘치는 순간 알아서 왼쪽 붙임으로 물러섭니다. 이 값을 모르는 브라우저는
    그 줄을 통째로 버리고 앞의 center 를 쓰므로, 넉넉한 PC 에서는 어디서나 가운데로 섭니다. */
-.izs-tabs{display:flex;justify-content:center;justify-content:safe center;gap:6px;overflow-x:auto;padding:0 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.izs-tabs{display:flex;justify-content:center;justify-content:safe center;gap:var(--izs-gap);overflow-x:auto;padding:0 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .izs-tabs::-webkit-scrollbar{display:none}
-.izs-tabs button{flex:0 0 auto;margin:0;border:1px solid #dfe3ee;background:#fff;color:#5a6178;border-radius:999px;padding:9px 17px;font:700 14px/1 inherit;font-family:inherit;letter-spacing:-.01em;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
-.izs-tabs button.on{background:#1b2340;border-color:#1b2340;color:#fff}
+/* font 단축 속성에 inherit 를 섞으면 안 됩니다. inherit 같은 CSS 공통 낱말은 값 전체일
+   때만 쓸 수 있어서, font:700 14px/1 inherit 는 무효가 되고 선언이 통째로 버려집니다.
+   그러면 글자 크기가 상속값(대개 16px)으로 서서 지정한 크기가 안 먹습니다.
+   그래서 아래처럼 낱개 속성으로 풀어 씁니다. 변수(var)를 쓰려면 어차피 이 편이 안전합니다. */
+.izs-tabs button{flex:0 0 auto;margin:0;border:1px solid var(--izs-off-line);background:var(--izs-off-bg);color:var(--izs-off-fg);border-radius:var(--izs-tab-round);padding:var(--izs-tab-pad);font-weight:700;font-size:var(--izs-tab-size);line-height:1;font-family:inherit;letter-spacing:-.01em;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.izs-tabs button.on{background:var(--izs-on-bg);border-color:var(--izs-on-bg);color:var(--izs-on-fg)}
 
 /* 창 높이는 고른 장에 맞춰 JS 가 인라인 padding-bottom 으로 넣습니다. height:0 인 이유는
    퍼센트 padding 만으로 높이를 만들기 위해서입니다. 장마다 높이가 10% 넘게 차이 나서
    가장 큰 것에 맞춰 두면 짧은 장 아래에 흰 바닥이 한참 남습니다. */
-.izs-view{position:relative;overflow:hidden;height:0;background:#fff;border-radius:12px;transition:padding-bottom .3s ease}
+.izs-view{position:relative;overflow:hidden;height:0;background:#fff;border-radius:var(--izs-round);transition:padding-bottom .3s ease}
 
 /* align-items 를 flex-start 로 두는 것이 중요합니다. 기본값 stretch 면 슬라이드가 트랙
    높이까지 늘어나 저마다의 높이가 무시되고 다음 장 머리가 아래에 비쳐 보입니다. */
@@ -197,20 +220,30 @@
    동그라미 한가운데에 안 서기 때문입니다. 그림 안에서 꺾쇠는 x 9.5~14.5, y 6.5~17.5 라
    24x24 상자의 정중앙(12,12)에 놓이고, background-position:center 가 그 그림을 동그라미
    한가운데에 놓습니다. 그래서 어떤 폰트에서도 언제나 가운데입니다.
+   꺾쇠는 흰색 고정입니다. 동그라미 색만 바꾸면 어떤 색 위에서도 읽히기 때문입니다.
    왼쪽 화살표는 같은 그림을 좌우로 뒤집어 씁니다. 동그라미라 뒤집어도 티가 안 납니다.
    끝에서 처음으로 도니까 비활성 상태가 없습니다. 언제나 둘 다 보입니다.
    모바일은 손가락으로 밀면 되므로 감춥니다. */
-.izs-a{position:absolute;top:50%;margin-top:-19px;z-index:3;width:38px;height:38px;border-radius:50%;background-color:rgba(27,35,64,.5);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M9.5 6.5 14.5 12 9.5 17.5'/></svg>");background-repeat:no-repeat;background-position:center;background-size:15px 15px;cursor:pointer;user-select:none}
-.izs-a:hover{background-color:rgba(27,35,64,.75)}
+.izs-a{position:absolute;top:50%;z-index:3;width:var(--izs-arrow-size);height:var(--izs-arrow-size);margin-top:calc(var(--izs-arrow-size) / -2);border-radius:50%;background-color:var(--izs-arrow);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M9.5 6.5 14.5 12 9.5 17.5'/></svg>");background-repeat:no-repeat;background-position:center;background-size:40% 40%;cursor:pointer;user-select:none}
+.izs-a:hover{background-color:var(--izs-arrow-on)}
 .izs-p{left:10px;transform:scaleX(-1)}
 .izs-n{right:10px}
+
+/* 상품마다 표시 한 줄로 고르는 것들. 표시에 배치=줄바꿈 처럼 적으면 js 가 이 클래스를
+   붙입니다. 클래스를 하나 더 낀 만큼 아래 @media 규칙보다 세므로 화면 폭과 상관없이
+   적은 대로 섭니다. 아무것도 안 적으면 이 클래스가 안 붙어서 기본(반응형)입니다. */
+.izs-wrap .izs-tabs{flex-wrap:wrap;overflow:visible}
+.izs-roll .izs-tabs{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
+.izs.izs-arw .izs-a{display:block}
+.izs.izs-noarw .izs-a{display:none}
 
 /* 모바일에서는 .ck-content 가 화면 폭까지 벌어져 있으므로(랜딩 조각의 breakout) 좌우 24 를
    margin 으로 직접 넣어 유튜브 카드·예약폼과 여백을 맞춥니다.
    탭은 옆으로 미는 대신 줄을 바꿔 전부 펼칩니다. 좁은 화면에서 옆으로 밀어야 하는 목록은
    가려진 뒤쪽을 못 보고 지나치기 쉬운데, 타입은 전부 훑어보고 고르는 것이라 한눈에 다
    보이는 편이 낫습니다. wrap 을 켜면 넘칠 일이 없으므로 스크롤 상자도 끕니다.
-   가운데정렬(safe center)은 위 기본 규칙 그대로라 줄마다 가운데로 섭니다. */
+   가운데정렬(safe center)은 위 기본 규칙 그대로라 줄마다 가운데로 섭니다.
+   이 줄바꿈 기준(768)과 배치 방식은 슬라이드메이커가 만들어 주는 뭉치로 덮어쓸 수 있습니다. */
 @media(max-width:768px){
   .izs{margin:24px}
   .izs-a{display:none}
