@@ -1819,6 +1819,10 @@ window.fitReserve = function (mount) {
   // 이름은 적으면 탭에 쓰고 안 적으면 번호를 씁니다. 개수가 안 맞아도 번호로 물러설 뿐
   // 슬라이더는 그대로 만듭니다. 표시를 못 찾거나 이미지가 없으면 아무것도 하지 않습니다.
   //
+  // 이름은 '몇 장이어야 하는가' 를 알려 주는 구실도 합니다. 이미 타입별로 잘라 올린 현장에서
+  // 우리가 괜히 더 자르면 이름 수와 안 맞게 되는데, 그때는 자르지 않은 쪽을 씁니다. 그래서
+  // 긴 이미지로 올린 현장과 타입별로 잘라 올린 현장이 같은 표시 하나로 다 됩니다.
+  //
   // 코드가 촘촘한 것은 취향이 아니라 큐샵 공통코드 한도 때문입니다. 주석은 빌드가 걷어냅니다.
   if (window.fitSlideUp) return;      // 공통푸터는 페이지당 두 벌 실행됩니다
   window.fitSlideUp = 1;
@@ -1918,13 +1922,20 @@ window.fitReserve = function (mount) {
   // 이름은 에디터에서 온 남의 글자라 textContent 로만 넣습니다. 주소는 이미 페이지에 있던
   // 이미지의 것을 src 로 직접 옮깁니다. innerHTML 로 문자열을 이어 붙이지 않습니다.
   function build(nm, rows, list) {
-    var b = [], i, im, t, j, box, tabs, view, track, prev, next, cur = 0, bt = [];
+    var b, one = [], many = [], i, im, t, j, box, tabs, view, track, prev, next, cur = 0, bt = [];
     for (i = 0; i < list.length; i++) {
       if (!list[i]) continue;
       im = list[i].im; t = list[i].cuts;
+      // 두 가지로 세어 둡니다. one = 이미지 한 장이 곧 한 장, many = 나눈 것
+      one.push({ u: im.src, w: im.naturalWidth, h: im.naturalHeight, y: 0, d: im.naturalHeight });
       for (j = 0; j < t.length; j++)
-        b.push({ u: im.src, w: im.naturalWidth, h: im.naturalHeight, y: t[j], d: (j + 1 < t.length ? t[j + 1] : im.naturalHeight) - t[j] });
+        many.push({ u: im.src, w: im.naturalWidth, h: im.naturalHeight, y: t[j], d: (j + 1 < t.length ? t[j + 1] : im.naturalHeight) - t[j] });
     }
+    // 이름을 적어 주었으면 그 개수가 곧 '몇 장이어야 하는가' 입니다. 나눈 쪽이 그 수와 다르고
+    // 안 나눈 쪽이 딱 맞으면, 이미 타입별로 잘라 올린 현장이라는 뜻이므로 나누지 않습니다.
+    // 타입 한 장 안에 넓은 사진이 하나 더 들어 있으면 그것을 다음 타입의 머리사진으로 잘못
+    // 볼 수 있는데(오산 헤리티지 자이의 166P 가 그랬습니다) 이 검사가 그것을 걷어냅니다.
+    b = (nm.length && nm.length !== many.length && nm.length === one.length) ? one : many;
     if (b.length < 2) return 0;                  // 한 장뿐이면 넘길 것이 없습니다
     // 그리기 직전 마지막 확인. 여기까지 오는 길이 비동기라(이미지를 기다립니다) 그 사이에
     // 다른 경로로 이미 만들어졌을 수 있습니다. 이 검사와 위 __izs 임자 표시 둘 다 있어야
