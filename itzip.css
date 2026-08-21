@@ -193,11 +193,16 @@
 
 /* 화살표. 창 높이 한가운데에 세웁니다. top 이 퍼센트라 고른 장의 높이를 따라가고,
    자기 키의 절반만큼 끌어올려야 진짜 가운데에 섭니다.
+   꺾쇠는 글자가 아니라 배경 그림입니다. 홑화살괄호 같은 글자는 폰트마다 좌우 여백이 달라
+   동그라미 한가운데에 안 서기 때문입니다. 그림 안에서 꺾쇠는 x 9.5~14.5, y 6.5~17.5 라
+   24x24 상자의 정중앙(12,12)에 놓이고, background-position:center 가 그 그림을 동그라미
+   한가운데에 놓습니다. 그래서 어떤 폰트에서도 언제나 가운데입니다.
+   왼쪽 화살표는 같은 그림을 좌우로 뒤집어 씁니다. 동그라미라 뒤집어도 티가 안 납니다.
    끝에서 처음으로 도니까 비활성 상태가 없습니다. 언제나 둘 다 보입니다.
    모바일은 손가락으로 밀면 되므로 감춥니다. */
-.izs-a{position:absolute;top:50%;margin-top:-19px;z-index:3;width:38px;height:38px;border-radius:50%;background:rgba(27,35,64,.5);color:#fff;font:400 22px/38px sans-serif;font-style:normal;text-align:center;cursor:pointer;user-select:none}
-.izs-a:hover{background:rgba(27,35,64,.75)}
-.izs-p{left:10px}
+.izs-a{position:absolute;top:50%;margin-top:-19px;z-index:3;width:38px;height:38px;border-radius:50%;background-color:rgba(27,35,64,.5);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M9.5 6.5 14.5 12 9.5 17.5'/></svg>");background-repeat:no-repeat;background-position:center;background-size:15px 15px;cursor:pointer;user-select:none}
+.izs-a:hover{background-color:rgba(27,35,64,.75)}
+.izs-p{left:10px;transform:scaleX(-1)}
 .izs-n{right:10px}
 
 /* 모바일에서는 .ck-content 가 화면 폭까지 벌어져 있으므로(랜딩 조각의 breakout) 좌우 24 를

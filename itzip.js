@@ -1855,15 +1855,23 @@ window.fitReserve = function (mount) {
     }
     return out;
   }
-  // 두 표시 사이의 직계 자식들. 표시 자체는 뺍니다. 이미 만들어 둔 구간이면 null 을 주어
-  // 다시 만들지 않게 합니다. 큐샵이 본문을 다시 그려도 두 벌이 겹쳐 생기지 않습니다.
+  // 두 표시 사이의 직계 자식들. 표시 자체는 뺍니다. 이미 손을 댄 구간이면 null 을 주어
+  // 다시 만들지 않게 합니다. 알아보는 표가 셋입니다.
+  //   className 'izs'   이미 만들어 둔 슬라이더가 그 자리에 있다
+  //   data-izs          만들면서 감춰 둔 원본이다
+  //   __izs             지금 이미지를 읽는 중이다. 아직 아무것도 안 생겼지만 임자가 있다
+  // 셋째가 없으면 안 됩니다. 이미지를 읽는 동안 큐샵이 본문을 다시 그리면 그때마다 place()
+  // 가 불려서 '아직 아무것도 없네' 하고 같은 구간을 또 만들기 시작합니다. 그렇게 출발한
+  // 여러 벌이 나중에 다 같이 완성되어 슬라이더가 서너 개씩 겹쳐 쌓입니다.
+  // 자바스크립트 속성으로 두는 이유는, 만들다 실패했을 때 아래 place() 의 '되살아난 원본
+  // 다시 감추기'가 이 노드들까지 감춰서 이미지를 통째로 없애 버리면 안 되기 때문입니다.
   function seg(c, a, b) {
     var r = [], n, on = 0, had = 0;
     for (n = c.firstChild; n; n = n.nextSibling) {
       if (n === a) { on = 1; continue; }
       if (n === b) return had ? null : r;
       if (!on || n.nodeType != 1) continue;
-      if (n.className === 'izs' || n.getAttribute('data-izs')) { had = 1; continue; }
+      if (n.className === 'izs' || n.__izs || n.getAttribute('data-izs')) { had = 1; continue; }
       r.push(n);
     }
     return null;                                 // 끝 표시가 시작보다 앞에 있으면 포기합니다
@@ -1918,6 +1926,10 @@ window.fitReserve = function (mount) {
         b.push({ u: im.src, w: im.naturalWidth, h: im.naturalHeight, y: t[j], d: (j + 1 < t.length ? t[j + 1] : im.naturalHeight) - t[j] });
     }
     if (b.length < 2) return 0;                  // 한 장뿐이면 넘길 것이 없습니다
+    // 그리기 직전 마지막 확인. 여기까지 오는 길이 비동기라(이미지를 기다립니다) 그 사이에
+    // 다른 경로로 이미 만들어졌을 수 있습니다. 이 검사와 위 __izs 임자 표시 둘 다 있어야
+    // 같은 자리에 두 벌이 겹쳐 쌓이지 않습니다.
+    for (i = 0; i < rows.length; i++) if (!rows[i].parentNode || rows[i].getAttribute('data-izs')) return 0;
     if (nm.length !== b.length) nm = null;       // 개수가 안 맞으면 이름 대신 번호
     box = document.createElement('div'); box.className = 'izs';
     tabs = document.createElement('div'); tabs.className = 'izs-tabs';
@@ -1936,8 +1948,10 @@ window.fitReserve = function (mount) {
       e.onclick = (function (k) { return function () { go(k); }; })(i);
       tabs.appendChild(e); bt.push(e);
     }
-    prev = document.createElement('b'); prev.className = 'izs-a izs-p'; prev.textContent = '\u2039';
-    next = document.createElement('b'); next.className = 'izs-a izs-n'; next.textContent = '\u203A';
+    // 꺾쇠 모양은 css 가 배경 그림으로 넣습니다. 글자로 두면 폰트마다 좌우 여백이 달라
+    // 동그라미 한가운데에 안 섭니다.
+    prev = document.createElement('b'); prev.className = 'izs-a izs-p';
+    next = document.createElement('b'); next.className = 'izs-a izs-n';
     prev.onclick = function () { go(cur - 1); };
     next.onclick = function () { go(cur + 1); };
     view.appendChild(track); view.appendChild(prev); view.appendChild(next);
@@ -2006,6 +2020,7 @@ window.fitReserve = function (mount) {
     if (!rows || !rows.length) return;
     for (i = 0; i < rows.length; i++) { e = rows[i].querySelector && rows[i].querySelector('img'); if (e) ims.push(e); }
     if (!ims.length) return;
+    for (i = 0; i < rows.length; i++) rows[i].__izs = 1;   // 임자 표시. 기다리기 전에 박습니다
     left = ims.length;
     for (i = 0; i < ims.length; i++) grab(i);
     function grab(k) {
