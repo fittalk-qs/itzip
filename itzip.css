@@ -139,3 +139,61 @@
   .vr-form .vr-row{display:flex;gap:10px;align-items:flex-start}
   .vr-form .vr-row>*{flex:1 1 0;min-width:0}
 }
+
+/* ===== itzip-7-slide.css ===== */
+/* 본문 한 구간을 좌우로 넘기게 만든 슬라이더. 구조는 itzip-7-slide.js 가 만듭니다.
+
+     div.izs
+       div.izs-tabs        이름(또는 번호) 알약들. 넘치면 가로로 밀어서 봅니다
+         button(.on)
+       div.izs-view        보이는 창. 높이는 고른 장에 맞춰 인라인으로 들어갑니다
+         div.izs-track     슬라이드를 옆으로 늘어놓고 translateX 로 밉니다
+           div.izs-s       한 장. 높이가 저마다 달라 인라인 padding-bottom 으로 받습니다
+             img           원본 이미지. 위로 끌어올려 자기 구간만 보입니다
+         b.izs-a           좌우 화살표 (PC 만)
+
+   왜 이미지를 잘라 새로 만들지 않고 밀어 올리나: 타입 이미지는 여러 장이 세로로 이어 붙은
+   한 장으로 옵니다. canvas 로 잘라 새 이미지를 만들면 같은 그림을 두 벌 들게 되고(7429px
+   짜리라 메모리가 큽니다) 화면 폭이 바뀔 때마다 다시 그려야 합니다. 같은 원본을 여러
+   슬라이드가 나눠 쓰고 보이는 구간만 다르게 하면 이미 받아 둔 그림 한 장으로 끝납니다.
+
+   크기는 전부 퍼센트라서 창 크기가 바뀌어도 JS 가 다시 계산할 일이 없습니다.
+     .izs-s 의 padding-bottom = 그 장 높이 / 원본 폭      (퍼센트 padding 은 폭 기준)
+     img 의 translateY        = -그 장 시작 y / 원본 높이 (퍼센트 translate 는 제 높이 기준)
+   이 계산은 이미지가 상자 폭을 정확히 100% 채운다는 전제 위에 섭니다. 아래 img 규칙이
+   그것을 보장합니다. */
+.izs{max-width:860px;margin:24px auto;text-align:left}
+
+/* 알약 탭. 열두 개까지 늘어나므로 넘치면 가로로 밉니다. 스크롤 막대는 감춥니다. */
+.izs-tabs{display:flex;gap:6px;overflow-x:auto;padding:0 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.izs-tabs::-webkit-scrollbar{display:none}
+.izs-tabs button{flex:0 0 auto;margin:0;border:1px solid #dfe3ee;background:#fff;color:#5a6178;border-radius:999px;padding:9px 17px;font:700 14px/1 inherit;font-family:inherit;letter-spacing:-.01em;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.izs-tabs button.on{background:#1b2340;border-color:#1b2340;color:#fff}
+
+/* 창 높이는 고른 장에 맞춰 JS 가 인라인 padding-bottom 으로 넣습니다. height:0 인 이유는
+   퍼센트 padding 만으로 높이를 만들기 위해서입니다. 장마다 높이가 10% 넘게 차이 나서
+   가장 큰 것에 맞춰 두면 짧은 장 아래에 흰 바닥이 한참 남습니다. */
+.izs-view{position:relative;overflow:hidden;height:0;background:#fff;border-radius:12px;transition:padding-bottom .3s ease}
+
+/* align-items 를 flex-start 로 두는 것이 중요합니다. 기본값 stretch 면 슬라이드가 트랙
+   높이까지 늘어나 저마다의 높이가 무시되고 다음 장 머리가 아래에 비쳐 보입니다. */
+.izs-track{position:absolute;top:0;left:0;width:100%;display:flex;align-items:flex-start;transition:transform .3s ease}
+.izs-s{flex:0 0 100%;position:relative;height:0;overflow:hidden}
+
+/* 큐샵과 랜딩 조각이 .productDetailPage #detail img 에 width:auto!important 를 걸어 둡니다.
+   (1,1,1) 이라 클래스 하나로는 !important 를 붙여도 못 이기므로 같은 앞머리에 우리 클래스를
+   얹어 (1,2,1) 로 이깁니다. 폭이 auto 로 서면 858px 짜리가 860 상자 안에서 99.8% 만 차지해
+   위 퍼센트 계산이 그만큼 어긋납니다. 상세페이지 밖에서도 쓰일 수 있게 클래스만 쓴 규칙을
+   같이 둡니다. */
+.izs-s img,.productDetailPage #detail .izs-s img{position:absolute!important;top:0!important;left:0!important;width:100%!important;max-width:none!important;height:auto!important;margin:0!important;display:block!important}
+
+/* 화살표. top 이 퍼센트라 창 높이를 따라가고 머리사진 언저리에 얹힙니다.
+   모바일은 손가락으로 밀면 되므로 감춥니다. */
+.izs-a{position:absolute;top:20%;z-index:3;width:38px;height:38px;border-radius:50%;background:rgba(27,35,64,.5);color:#fff;font:400 22px/38px sans-serif;font-style:normal;text-align:center;cursor:pointer;user-select:none}
+.izs-p{left:10px}
+.izs-n{right:10px}
+.izs-a.off{display:none}
+
+/* 모바일에서는 .ck-content 가 화면 폭까지 벌어져 있으므로(랜딩 조각의 breakout) 좌우 24 를
+   margin 으로 직접 넣어 유튜브 카드·예약폼과 여백을 맞춥니다. */
+@media(max-width:768px){.izs{margin:24px}.izs-a{display:none}}

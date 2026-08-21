@@ -1787,3 +1787,226 @@ window.fitReserve = function (mount) {
     }
   });
 };
+
+/* ===== itzip-7-slide.js ===== */
+(function () {
+  // 상세설명 본문의 한 구간을 좌우로 넘기는 슬라이더로 바꿉니다. 타입(평면도)처럼 이미지가
+  // 여러 장 이어지는 곳에 씁니다.
+  //
+  // 상세설명에 쓰는 표시 (예약폼과 같은 결입니다. 주석으로 넣어도 같습니다)
+  //   [슬라이드시작]                     여기부터
+  //   [슬라이드시작:59A,59B,74A]         탭에 이 이름들을 씁니다
+  //   [슬라이드끝]                       여기까지
+  //   <!--슬라이드시작--> <!--슬라이드끝-->
+  //
+  // 두 표시 사이에 있는 것이 재료입니다. 이미지가 아닌 것(빈 문단 등)은 슬라이더에 안 들어
+  // 가고 같이 감춰집니다. 구간을 사람이 정해 주므로 코드가 '어디까지가 한 묶음인가'를
+  // 추측하지 않습니다. 나중에 사이에 글 한 줄을 끼워 넣어도 묶음이 깨지지 않습니다.
+  //
+  // 긴 이미지는 알아서 나눕니다: 타입 이미지는 보통 여러 타입이 세로로 이어 붙은 한 장으로
+  // 옵니다. 이 현장은 12타입이 세 장에 나뉘어 있고 한 장이 7429px 입니다. 타입마다 맨 위에
+  // 가로를 꽉 채운 머리사진(타입명이 얹힌 사진)이 오고 평면도는 흰 바탕 가운데에만 그림이
+  // 있어 가로가 안 찹니다. 그래서 '가로가 거의 다 찬 줄'이 250px 넘게 이어지는 곳이 곧 한
+  // 장의 시작입니다. 머리사진 가운데에 흰 면적 상자가 얹혀 있어 한 번 끊기므로 120px 까지
+  // 벌어진 것은 이어진 것으로 봅니다. 캔버스에 폭 32 로 줄여 그린 뒤 읽습니다. 폭을 24 로
+  // 하든 96 으로 하든 같은 답이 나왔고 이 현장 세 장을 합쳐 100ms 안쪽입니다.
+  // 나눌 곳을 못 찾으면 그 이미지는 통째로 한 장이 됩니다. 평범한 이미지 여러 장을 넣어도
+  // 그대로 한 장씩 슬라이드가 되므로 타입이 아닌 곳에도 그냥 쓸 수 있습니다.
+  //
+  // 이름은 적으면 탭에 쓰고 안 적으면 번호를 씁니다. 개수가 안 맞아도 번호로 물러설 뿐
+  // 슬라이더는 그대로 만듭니다. 표시를 못 찾거나 이미지가 없으면 아무것도 하지 않습니다.
+  //
+  // 코드가 촘촘한 것은 취향이 아니라 큐샵 공통코드 한도 때문입니다. 주석은 빌드가 걷어냅니다.
+  if (window.fitSlideUp) return;      // 공통푸터는 페이지당 두 벌 실행됩니다
+  window.fitSlideUp = 1;
+  var W = 32, LIGHT = 245, FILL = .95, GAP = 120, MIN = 250, A = '슬라이드시작', B = '슬라이드끝';
+  function up(n, c) { while (n && n.parentNode && n.parentNode !== c) n = n.parentNode; return n; }
+  function hit(s, w) {
+    // [슬라이드시작:이름,이름] 에서 뒤쪽 이름들만 떼어 냅니다. 대괄호와 공백은 있으나 없으나
+    // 같고, 콜론이 없으면 이름이 없는 것입니다.
+    var m = new RegExp('\\[?\\s*' + w + '\\s*[:\uFF1A]?([^\\]\\n]*)').exec(s || '');
+    return m ? m[1] : null;
+  }
+  function names(s) {
+    var a = (s || '').split(/[,\uFF0C]/), r = [], i, v;
+    for (i = 0; i < a.length; i++) { v = a[i].replace(/^[\s\]]+|[\s\]]+$/g, ''); if (v) r.push(v); }
+    return r;
+  }
+  // 표시 찾기. 글로 쓴 것을 먼저 보고 없으면 주석을 봅니다. 예약폼 조각과 같은 순서입니다.
+  function mark(c, w) {
+    var kid = c.childNodes, i, n, m, wk, q;
+    for (i = 0; i < kid.length; i++) {
+      n = kid[i];
+      if (n.nodeType == 8) { m = hit(n.nodeValue, w); if (m !== null) return { at: n, s: m }; continue; }
+      if (n.nodeType != 1 || (n.querySelector && n.querySelector('img'))) continue;
+      m = hit(n.textContent, w);
+      if (m !== null) return { at: n, s: m };
+    }
+    wk = document.createTreeWalker(c, 128);      // 128 은 주석 노드만 보라는 뜻입니다
+    while ((q = wk.nextNode())) { m = hit(q.nodeValue, w); if (m !== null) return { at: up(q, c), s: m }; }
+    return null;
+  }
+  // 두 표시 사이의 직계 자식들. 표시 자체는 뺍니다.
+  function seg(c, a, b) {
+    var r = [], n, on = 0;
+    for (n = c.firstChild; n; n = n.nextSibling) {
+      if (n === a) { on = 1; continue; }
+      if (n === b) return r;
+      if (on && n.nodeType == 1) r.push(n);
+    }
+    return null;                                  // 끝 표시가 시작보다 앞에 있으면 포기합니다
+  }
+  // 픽셀을 읽으려면 CORS 로 받아 둔 그림이어야 합니다. 아직 아니면 모드를 바꿔 다시 물립니다.
+  // 슬라이드가 쓸 img 도 같은 주소에 같은 모드라 브라우저가 받아 둔 것을 그대로 씁니다.
+  // 그래서 12장이 원본 세 장을 나눠 써도 내려받는 것은 결국 세 장뿐입니다.
+  function ready(im, cb) {
+    if (im.crossOrigin && im.complete && im.naturalWidth) return cb(im);
+    function off() { im.removeEventListener('load', on); im.removeEventListener('error', er); }
+    function on() { off(); cb(im.naturalWidth ? im : null); }
+    function er() { off(); cb(null); }
+    im.addEventListener('load', on);
+    im.addEventListener('error', er);
+    if (!im.crossOrigin) { var u = im.src; im.crossOrigin = 'anonymous'; im.src = u; }
+  }
+  // 한 장이 시작하는 y 들. 못 읽으면(그림이 있는 곳이 CORS 를 안 열어 준 경우) 통째로 한 장
+  // 으로 봅니다. 나눌 곳을 못 찾았을 때도 마찬가지입니다.
+  function cuts(im) {
+    var H = im.naturalHeight, c = document.createElement('canvas'), g, d, y, x, i, n, run = [], st = null, m = [], out = [];
+    if (!H || !c.getContext) return [0];
+    c.width = W; c.height = H;
+    g = c.getContext('2d');
+    g.drawImage(im, 0, 0, W, H);
+    try { d = g.getImageData(0, 0, W, H).data; } catch (e) { return [0]; }
+    for (y = 0; y < H; y++) {
+      n = 0;
+      for (x = 0; x < W; x++) {
+        i = (y * W + x) * 4;
+        if ((d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 < LIGHT) n++;
+      }
+      if (n / W > FILL) { if (st === null) st = y; }
+      else if (st !== null) { run.push([st, y]); st = null; }
+    }
+    if (st !== null) run.push([st, H]);
+    for (i = 0; i < run.length; i++) {
+      if (m.length && run[i][0] - m[m.length - 1][1] < GAP) m[m.length - 1][1] = run[i][1];
+      else m.push([run[i][0], run[i][1]]);
+    }
+    for (i = 0; i < m.length; i++) if (m[i][1] - m[i][0] >= MIN) out.push(m[i][0]);
+    if (!out.length || out[0] !== 0) out.unshift(0);   // 첫 장은 언제나 맨 위에서 시작합니다
+    return out;
+  }
+  // 이름은 에디터에서 온 남의 글자라 textContent 로만 넣습니다. 주소는 이미 페이지에 있던
+  // 이미지의 것을 src 로 직접 옮깁니다. innerHTML 로 문자열을 이어 붙이지 않습니다.
+  function build(nm, rows, list) {
+    var b = [], i, im, t, j, box, tabs, view, track, prev, next, cur = 0, bt = [];
+    for (i = 0; i < list.length; i++) {
+      if (!list[i]) continue;
+      im = list[i].im; t = list[i].cuts;
+      for (j = 0; j < t.length; j++)
+        b.push({ u: im.src, w: im.naturalWidth, h: im.naturalHeight, y: t[j], d: (j + 1 < t.length ? t[j + 1] : im.naturalHeight) - t[j] });
+    }
+    if (b.length < 2) return 0;                  // 한 장뿐이면 넘길 것이 없습니다
+    if (nm.length !== b.length) nm = null;       // 개수가 안 맞으면 이름 대신 번호
+    box = document.createElement('div'); box.className = 'izs';
+    tabs = document.createElement('div'); tabs.className = 'izs-tabs';
+    view = document.createElement('div'); view.className = 'izs-view';
+    track = document.createElement('div'); track.className = 'izs-track';
+    for (i = 0; i < b.length; i++) {
+      var s = document.createElement('div'), g = document.createElement('img'), e = document.createElement('button');
+      s.className = 'izs-s';
+      s.style.paddingBottom = (b[i].d / b[i].w * 100).toFixed(3) + '%';
+      g.crossOrigin = 'anonymous';
+      g.alt = nm ? nm[i] : '';
+      g.style.transform = 'translateY(' + (-b[i].y / b[i].h * 100).toFixed(4) + '%)';
+      g.src = b[i].u;
+      s.appendChild(g); track.appendChild(s);
+      e.type = 'button'; e.textContent = nm ? nm[i] : String(i + 1);
+      e.onclick = (function (k) { return function () { go(k); }; })(i);
+      tabs.appendChild(e); bt.push(e);
+    }
+    prev = document.createElement('b'); prev.className = 'izs-a izs-p'; prev.textContent = '\u2039';
+    next = document.createElement('b'); next.className = 'izs-a izs-n'; next.textContent = '\u203A';
+    prev.onclick = function () { go(cur - 1); };
+    next.onclick = function () { go(cur + 1); };
+    view.appendChild(track); view.appendChild(prev); view.appendChild(next);
+    box.appendChild(tabs); box.appendChild(view);
+    // 창 높이는 고른 장에 맞춥니다. 장마다 높이가 10% 넘게 차이 나서 가장 큰 것에 맞춰 두면
+    // 짧은 장 아래에 흰 바닥이 한참 남습니다.
+    function go(k) {
+      var i2;
+      k = k < 0 ? 0 : k >= b.length ? b.length - 1 : k;
+      cur = k;
+      track.style.transform = 'translateX(' + (-k * 100) + '%)';
+      view.style.paddingBottom = (b[k].d / b[k].w * 100).toFixed(3) + '%';
+      for (i2 = 0; i2 < bt.length; i2++) bt[i2].className = i2 === k ? 'on' : '';
+      tabs.scrollLeft = bt[k].offsetLeft - (tabs.clientWidth - bt[k].offsetWidth) / 2;
+      prev.className = 'izs-a izs-p' + (k ? '' : ' off');
+      next.className = 'izs-a izs-n' + (k < b.length - 1 ? '' : ' off');
+    }
+    // 손가락으로 밀기. 처음 몇 px 로 가로인지 세로인지 정하고 가로일 때만 화면 스크롤을
+    // 막습니다. 이러지 않으면 슬라이더 위에서 페이지를 위아래로 못 넘깁니다.
+    var x0 = 0, y0 = 0, dx = 0, way = 0;
+    view.addEventListener('touchstart', function (e) {
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; way = 0;
+      track.style.transition = 'none';
+    }, true);
+    function drag(e) {
+      var ax = e.touches[0].clientX - x0, ay = e.touches[0].clientY - y0;
+      if (!way) way = Math.abs(ax) > Math.abs(ay) + 4 ? 1 : Math.abs(ay) > 4 ? 2 : 0;
+      if (way != 1) return;
+      dx = ax;
+      if (e.cancelable) e.preventDefault();
+      track.style.transform = 'translateX(calc(' + (-cur * 100) + '% + ' + Math.round(dx) + 'px))';
+    }
+    // passive:false 를 줘야 preventDefault 가 먹습니다. 옵션 객체를 모르는 옛 브라우저는
+    // 두 번째 인자를 참으로 읽어 캡처로 붙는데 그래도 동작에는 지장이 없습니다.
+    try { view.addEventListener('touchmove', drag, { passive: false }); }
+    catch (e) { view.addEventListener('touchmove', drag, false); }
+    view.addEventListener('touchend', function () {
+      track.style.transition = '';
+      go(way == 1 && Math.abs(dx) > 40 ? cur + (dx < 0 ? 1 : -1) : cur);
+    }, true);
+    rows[0].parentNode.insertBefore(box, rows[0]);
+    for (i = 0; i < rows.length; i++) { rows[i].setAttribute('data-izs', '1'); rows[i].style.display = 'none'; }
+    go(0);
+    return 1;
+  }
+  function place() {
+    var c = document.querySelector('.productDetailPage #detail .ck-content'), a, z, rows, ims = [], list = [], left, i, old;
+    if (!c) return;
+    // 큐샵이 상세설명을 다시 그리면 감춰 둔 원본이 되살아납니다. 그때는 다시 감추기만 합니다.
+    if (c.querySelector('.izs')) {
+      old = c.querySelectorAll('[data-izs]');
+      for (i = 0; i < old.length; i++) old[i].style.display = 'none';
+      return;
+    }
+    a = mark(c, A); z = mark(c, B);
+    if (!a || !z) return;
+    rows = seg(c, a.at, z.at);
+    if (!rows || !rows.length) return;
+    for (i = 0; i < rows.length; i++) if (rows[i].querySelector && rows[i].querySelector('img')) ims.push(rows[i].querySelector('img'));
+    if (!ims.length) return;
+    left = ims.length;
+    for (i = 0; i < ims.length; i++) grab(i);
+    function grab(k) {
+      ready(ims[k], function (im) {
+        list[k] = im ? { im: im, cuts: cuts(im) } : null;
+        if (--left) return;
+        if (!build(names(a.s), rows, list)) return;   // 못 만들면 지금 모습 그대로 둡니다
+        drop(a.at); drop(z.at);
+      });
+    }
+    // 글로 쓴 표시는 지웁니다. 주석은 어차피 안 보이므로 그대로 둡니다.
+    function drop(n) { if (n.nodeType == 1 && n.parentNode) n.parentNode.removeChild(n); }
+  }
+  // 상세설명은 큐샵이 나중에 그려 넣으므로 한 번만 훑으면 놓칩니다. 변경을 다음 프레임
+  // 한 번으로 모아서 처리합니다.
+  var q = 0;
+  function scan() {
+    if (q) return;
+    q = 1;
+    (window.requestAnimationFrame || function (f) { setTimeout(f, 16); })(function () { q = 0; place(); });
+  }
+  scan();
+  try { new MutationObserver(scan).observe(document.documentElement, { childList: 1, subtree: 1 }); } catch (e) {}
+})();
