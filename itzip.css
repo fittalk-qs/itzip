@@ -164,8 +164,12 @@
    그것을 보장합니다. */
 .izs{max-width:860px;margin:24px auto;text-align:left}
 
-/* 알약 탭. 열두 개까지 늘어나므로 넘치면 가로로 밉니다. 스크롤 막대는 감춥니다. */
-.izs-tabs{display:flex;gap:6px;overflow-x:auto;padding:0 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* 알약 탭. 가운데로 모으되 넘치면 가로로 밉니다. 스크롤 막대는 감춥니다.
+   justify-content 를 두 번 쓰는 것은 오타가 아닙니다. 그냥 center 로 두면 탭이 상자보다
+   길어졌을 때 왼쪽으로 넘친 부분이 스크롤로도 닿지 않습니다(첫 탭이 잘려서 안 나옵니다).
+   safe center 는 넘치는 순간 알아서 왼쪽 붙임으로 물러섭니다. 이 값을 모르는 브라우저는
+   그 줄을 통째로 버리고 앞의 center 를 쓰므로, 넉넉한 PC 에서는 어디서나 가운데로 섭니다. */
+.izs-tabs{display:flex;justify-content:center;justify-content:safe center;gap:6px;overflow-x:auto;padding:0 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .izs-tabs::-webkit-scrollbar{display:none}
 .izs-tabs button{flex:0 0 auto;margin:0;border:1px solid #dfe3ee;background:#fff;color:#5a6178;border-radius:999px;padding:9px 17px;font:700 14px/1 inherit;font-family:inherit;letter-spacing:-.01em;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
 .izs-tabs button.on{background:#1b2340;border-color:#1b2340;color:#fff}
@@ -187,12 +191,14 @@
    같이 둡니다. */
 .izs-s img,.productDetailPage #detail .izs-s img{position:absolute!important;top:0!important;left:0!important;width:100%!important;max-width:none!important;height:auto!important;margin:0!important;display:block!important}
 
-/* 화살표. top 이 퍼센트라 창 높이를 따라가고 머리사진 언저리에 얹힙니다.
+/* 화살표. 창 높이 한가운데에 세웁니다. top 이 퍼센트라 고른 장의 높이를 따라가고,
+   자기 키의 절반만큼 끌어올려야 진짜 가운데에 섭니다.
+   끝에서 처음으로 도니까 비활성 상태가 없습니다. 언제나 둘 다 보입니다.
    모바일은 손가락으로 밀면 되므로 감춥니다. */
-.izs-a{position:absolute;top:20%;z-index:3;width:38px;height:38px;border-radius:50%;background:rgba(27,35,64,.5);color:#fff;font:400 22px/38px sans-serif;font-style:normal;text-align:center;cursor:pointer;user-select:none}
+.izs-a{position:absolute;top:50%;margin-top:-19px;z-index:3;width:38px;height:38px;border-radius:50%;background:rgba(27,35,64,.5);color:#fff;font:400 22px/38px sans-serif;font-style:normal;text-align:center;cursor:pointer;user-select:none}
+.izs-a:hover{background:rgba(27,35,64,.75)}
 .izs-p{left:10px}
 .izs-n{right:10px}
-.izs-a.off{display:none}
 
 /* 모바일에서는 .ck-content 가 화면 폭까지 벌어져 있으므로(랜딩 조각의 breakout) 좌우 24 를
    margin 으로 직접 넣어 유튜브 카드·예약폼과 여백을 맞춥니다. */

@@ -1799,17 +1799,20 @@ window.fitReserve = function (mount) {
   //   [슬라이드끝]                       여기까지
   //   <!--슬라이드시작--> <!--슬라이드끝-->
   //
+  // 한 페이지에 여러 벌을 넣어도 됩니다. 시작과 끝을 짝지어 순서대로 다 만듭니다. 짝이 안
+  // 맞는 표시(끝이 없는 시작, 시작이 없는 끝)는 그냥 무시합니다.
+  //
   // 두 표시 사이에 있는 것이 재료입니다. 이미지가 아닌 것(빈 문단 등)은 슬라이더에 안 들어
   // 가고 같이 감춰집니다. 구간을 사람이 정해 주므로 코드가 '어디까지가 한 묶음인가'를
   // 추측하지 않습니다. 나중에 사이에 글 한 줄을 끼워 넣어도 묶음이 깨지지 않습니다.
   //
   // 긴 이미지는 알아서 나눕니다: 타입 이미지는 보통 여러 타입이 세로로 이어 붙은 한 장으로
-  // 옵니다. 이 현장은 12타입이 세 장에 나뉘어 있고 한 장이 7429px 입니다. 타입마다 맨 위에
+  // 옵니다. 어느 현장은 12타입이 세 장에 나뉘어 있고 한 장이 7429px 입니다. 타입마다 맨 위에
   // 가로를 꽉 채운 머리사진(타입명이 얹힌 사진)이 오고 평면도는 흰 바탕 가운데에만 그림이
   // 있어 가로가 안 찹니다. 그래서 '가로가 거의 다 찬 줄'이 250px 넘게 이어지는 곳이 곧 한
   // 장의 시작입니다. 머리사진 가운데에 흰 면적 상자가 얹혀 있어 한 번 끊기므로 120px 까지
   // 벌어진 것은 이어진 것으로 봅니다. 캔버스에 폭 32 로 줄여 그린 뒤 읽습니다. 폭을 24 로
-  // 하든 96 으로 하든 같은 답이 나왔고 이 현장 세 장을 합쳐 100ms 안쪽입니다.
+  // 하든 96 으로 하든 같은 답이 나왔고 세 장을 합쳐 100ms 안쪽입니다.
   // 나눌 곳을 못 찾으면 그 이미지는 통째로 한 장이 됩니다. 평범한 이미지 여러 장을 넣어도
   // 그대로 한 장씩 슬라이드가 되므로 타입이 아닌 곳에도 그냥 쓸 수 있습니다.
   //
@@ -1820,7 +1823,6 @@ window.fitReserve = function (mount) {
   if (window.fitSlideUp) return;      // 공통푸터는 페이지당 두 벌 실행됩니다
   window.fitSlideUp = 1;
   var W = 32, LIGHT = 245, FILL = .95, GAP = 120, MIN = 250, A = '슬라이드시작', B = '슬라이드끝';
-  function up(n, c) { while (n && n.parentNode && n.parentNode !== c) n = n.parentNode; return n; }
   function hit(s, w) {
     // [슬라이드시작:이름,이름] 에서 뒤쪽 이름들만 떼어 냅니다. 대괄호와 공백은 있으나 없으나
     // 같고, 콜론이 없으면 이름이 없는 것입니다.
@@ -1832,29 +1834,39 @@ window.fitReserve = function (mount) {
     for (i = 0; i < a.length; i++) { v = a[i].replace(/^[\s\]]+|[\s\]]+$/g, ''); if (v) r.push(v); }
     return r;
   }
-  // 표시 찾기. 글로 쓴 것을 먼저 보고 없으면 주석을 봅니다. 예약폼 조각과 같은 순서입니다.
-  function mark(c, w) {
-    var kid = c.childNodes, i, n, m, wk, q;
-    for (i = 0; i < kid.length; i++) {
-      n = kid[i];
-      if (n.nodeType == 8) { m = hit(n.nodeValue, w); if (m !== null) return { at: n, s: m }; continue; }
-      if (n.nodeType != 1 || (n.querySelector && n.querySelector('img'))) continue;
-      m = hit(n.textContent, w);
-      if (m !== null) return { at: n, s: m };
+  // 본문 맨 위에서 아래로 훑으며 표시를 순서대로 모읍니다. 글로 쓴 것과 주석을 한 줄에 놓고
+  // 보아야 여러 벌의 짝을 제대로 지을 수 있어서 한 번에 훑습니다.
+  //   k=1 시작표시, k=0 끝표시, at=본문 직계 자식(이 자리에 슬라이더가 들어갑니다)
+  function marks(c) {
+    var out = [], n, wk, q;
+    function put(host, s) {
+      var x = hit(s, A);
+      if (x !== null) { out.push({ k: 1, at: host, s: x }); return 1; }
+      x = hit(s, B);
+      if (x !== null) { out.push({ k: 0, at: host }); return 1; }
+      return 0;
     }
-    wk = document.createTreeWalker(c, 128);      // 128 은 주석 노드만 보라는 뜻입니다
-    while ((q = wk.nextNode())) { m = hit(q.nodeValue, w); if (m !== null) return { at: up(q, c), s: m }; }
-    return null;
+    for (n = c.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == 8) { put(n, n.nodeValue); continue; }
+      if (n.nodeType != 1 || (n.querySelector && n.querySelector('img'))) continue;
+      if (put(n, n.textContent)) continue;
+      wk = document.createTreeWalker(n, 128);   // 128 은 주석 노드만 보라는 뜻입니다
+      while ((q = wk.nextNode())) if (put(n, q.nodeValue)) break;
+    }
+    return out;
   }
-  // 두 표시 사이의 직계 자식들. 표시 자체는 뺍니다.
+  // 두 표시 사이의 직계 자식들. 표시 자체는 뺍니다. 이미 만들어 둔 구간이면 null 을 주어
+  // 다시 만들지 않게 합니다. 큐샵이 본문을 다시 그려도 두 벌이 겹쳐 생기지 않습니다.
   function seg(c, a, b) {
-    var r = [], n, on = 0;
+    var r = [], n, on = 0, had = 0;
     for (n = c.firstChild; n; n = n.nextSibling) {
       if (n === a) { on = 1; continue; }
-      if (n === b) return r;
-      if (on && n.nodeType == 1) r.push(n);
+      if (n === b) return had ? null : r;
+      if (!on || n.nodeType != 1) continue;
+      if (n.className === 'izs' || n.getAttribute('data-izs')) { had = 1; continue; }
+      r.push(n);
     }
-    return null;                                  // 끝 표시가 시작보다 앞에 있으면 포기합니다
+    return null;                                 // 끝 표시가 시작보다 앞에 있으면 포기합니다
   }
   // 픽셀을 읽으려면 CORS 로 받아 둔 그림이어야 합니다. 아직 아니면 모드를 바꿔 다시 물립니다.
   // 슬라이드가 쓸 img 도 같은 주소에 같은 모드라 브라우저가 받아 둔 것을 그대로 씁니다.
@@ -1930,18 +1942,21 @@ window.fitReserve = function (mount) {
     next.onclick = function () { go(cur + 1); };
     view.appendChild(track); view.appendChild(prev); view.appendChild(next);
     box.appendChild(tabs); box.appendChild(view);
-    // 창 높이는 고른 장에 맞춥니다. 장마다 높이가 10% 넘게 차이 나서 가장 큰 것에 맞춰 두면
-    // 짧은 장 아래에 흰 바닥이 한참 남습니다.
+    // 끝에서 한 칸 더 가면 처음으로, 처음에서 뒤로 가면 끝으로 돌아옵니다.
+    // 두 칸 넘게 건너뛸 때는 애니메이션을 끕니다. 탭으로 59A 에서 125P 로 갈 때 열두 장을
+    // 0.3초 만에 훑고 지나가면 그냥 번쩍이는 것으로 보이고, 끝에서 처음으로 도는 것도
+    // 되감기처럼 보이기 때문입니다. 옆칸으로 한 칸씩 움직일 때만 미끄러집니다.
     function go(k) {
-      var i2;
-      k = k < 0 ? 0 : k >= b.length ? b.length - 1 : k;
+      var n = b.length, far, i2;
+      k = (k % n + n) % n;
+      far = Math.abs(k - cur) > 1;
       cur = k;
+      if (far) track.style.transition = 'none';
       track.style.transform = 'translateX(' + (-k * 100) + '%)';
+      if (far) { void track.offsetWidth; track.style.transition = ''; }   // 리플로우로 즉시 반영
       view.style.paddingBottom = (b[k].d / b[k].w * 100).toFixed(3) + '%';
       for (i2 = 0; i2 < bt.length; i2++) bt[i2].className = i2 === k ? 'on' : '';
       tabs.scrollLeft = bt[k].offsetLeft - (tabs.clientWidth - bt[k].offsetWidth) / 2;
-      prev.className = 'izs-a izs-p' + (k ? '' : ' off');
-      next.className = 'izs-a izs-n' + (k < b.length - 1 ? '' : ' off');
     }
     // 손가락으로 밀기. 처음 몇 px 로 가로인지 세로인지 정하고 가로일 때만 화면 스크롤을
     // 막습니다. 이러지 않으면 슬라이더 위에서 페이지를 위아래로 못 넘깁니다.
@@ -1972,19 +1987,24 @@ window.fitReserve = function (mount) {
     return 1;
   }
   function place() {
-    var c = document.querySelector('.productDetailPage #detail .ck-content'), a, z, rows, ims = [], list = [], left, i, old;
+    var c = document.querySelector('.productDetailPage #detail .ck-content'), old, all, i, a = null;
     if (!c) return;
-    // 큐샵이 상세설명을 다시 그리면 감춰 둔 원본이 되살아납니다. 그때는 다시 감추기만 합니다.
-    if (c.querySelector('.izs')) {
-      old = c.querySelectorAll('[data-izs]');
-      for (i = 0; i < old.length; i++) old[i].style.display = 'none';
-      return;
+    // 큐샵이 상세설명을 다시 그리면 감춰 둔 원본이 되살아납니다. 그때는 다시 감춥니다.
+    old = c.querySelectorAll('[data-izs]');
+    for (i = 0; i < old.length; i++) old[i].style.display = 'none';
+    all = marks(c);
+    for (i = 0; i < all.length; i++) {
+      if (all[i].k) { a = all[i]; continue; }   // 시작표시를 들고 있다가
+      if (!a) continue;                         // 짝 없는 끝표시는 버립니다
+      one(c, a, all[i]);
+      a = null;
     }
-    a = mark(c, A); z = mark(c, B);
-    if (!a || !z) return;
-    rows = seg(c, a.at, z.at);
+  }
+  // 한 벌을 만듭니다. 이미지를 다 읽은 뒤에야 그릴 수 있으므로 여기서 기다립니다.
+  function one(c, a, z) {
+    var rows = seg(c, a.at, z.at), ims = [], list = [], left, i, e;
     if (!rows || !rows.length) return;
-    for (i = 0; i < rows.length; i++) if (rows[i].querySelector && rows[i].querySelector('img')) ims.push(rows[i].querySelector('img'));
+    for (i = 0; i < rows.length; i++) { e = rows[i].querySelector && rows[i].querySelector('img'); if (e) ims.push(e); }
     if (!ims.length) return;
     left = ims.length;
     for (i = 0; i < ims.length; i++) grab(i);
@@ -1996,7 +2016,8 @@ window.fitReserve = function (mount) {
         drop(a.at); drop(z.at);
       });
     }
-    // 글로 쓴 표시는 지웁니다. 주석은 어차피 안 보이므로 그대로 둡니다.
+    // 글로 쓴 표시는 지웁니다. 주석은 어차피 안 보이므로 그대로 둡니다. 다시 훑을 때는
+    // seg() 가 이미 만든 구간을 알아보고 건너뜁니다.
     function drop(n) { if (n.nodeType == 1 && n.parentNode) n.parentNode.removeChild(n); }
   }
   // 상세설명은 큐샵이 나중에 그려 넣으므로 한 번만 훑으면 놓칩니다. 변경을 다음 프레임
