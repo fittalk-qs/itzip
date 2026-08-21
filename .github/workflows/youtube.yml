@@ -1,0 +1,194 @@
+# ============================================================
+#  잇집 유튜브 목록 자동 갱신
+#
+#  하는 일: 1시간마다 유튜브에 "잇집 채널 최근 영상 뭐뭐 있어?" 하고 물어본 뒤,
+#           그 답을 itzip-videos.json 파일에 적어 저장소에 저장합니다.
+#           홈페이지의 유튜브 섹션 두 개(숏츠/일반영상)는 그 파일만 읽습니다.
+#
+#  왜 이렇게 하나: 예전에는 홈페이지에 손님이 들어올 때마다 그 손님 브라우저가
+#           유튜브에 직접 물어봤습니다. 유튜브는 하루에 물어볼 수 있는 횟수가
+#           정해져 있어서(10000), 손님 1600명이면 끊겼습니다. 광고를 돌리면
+#           금방 넘습니다. 이제는 깃허브가 하루 24번만 물어보므로, 손님이
+#           10만명이 와도 사용량은 그대로입니다.
+#
+#  놓을 위치: 저장소의  .github/workflows/youtube.yml
+#  필요한 것: 저장소 Settings > Secrets and variables > Actions 에
+#             YT_API_KEY 라는 이름으로 유튜브 API 키 등록
+#
+#  급할 때(영상 올리자마자 바로 반영하고 싶을 때):
+#             저장소 Actions 탭 > 왼쪽에서 이 워크플로 선택 > Run workflow 버튼
+# ============================================================
+name: 잇집 유튜브 목록 갱신
+
+on:
+  schedule:
+    # 매시 17분에 실행. 깃허브가 붐빌 때는 5~15분 늦게 돌기도 하는데 정상입니다.
+    # 정각(0분)은 전 세계가 몰려 가장 많이 밀리므로 일부러 피했습니다.
+    - cron: '17 * * * *'
+  workflow_dispatch:        # Actions 탭의 수동 실행 버튼
+
+permissions:
+  contents: write           # 갱신된 json 을 저장소에 커밋하려면 필요
+
+concurrency:
+  group: itzip-youtube      # 앞 실행이 아직 안 끝났으면 겹치지 않게
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 유튜브에서 목록 받아오기
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          YT_CHANNEL: '@itzip-apt'
+        run: |
+          cat > fetch-youtube.mjs <<'SCRIPT'
+          import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+
+          const KEY = process.env.YT_API_KEY;
+          const HANDLE = process.env.YT_CHANNEL || '@itzip-apt';
+          if (!KEY) {
+            console.error('YT_API_KEY 가 없습니다. 저장소 Settings > Secrets and variables > Actions 에 등록하세요.');
+            process.exit(1);
+          }
+
+          async function api(path) {
+            const r = await fetch('https://www.googleapis.com/youtube/v3/' + path + '&key=' + KEY);
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) {
+              const msg = (j.error && j.error.message) || (r.status + ' ' + r.statusText);
+              throw new Error(path.split('?')[0] + ' 실패: ' + msg);
+            }
+            return j;
+          }
+
+          // "PT6M23S" -> 383 (초)
+          function toSec(iso) {
+            const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || '');
+            if (!m) return 0;
+            return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
+          }
+          // 383 -> "6:23"
+          function toLabel(sec) {
+            const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+            const p = (n) => (n < 10 ? '0' : '') + n;
+            return h ? h + ':' + p(m) + ':' + p(s) : m + ':' + p(s);
+          }
+
+          // 1) 채널 핸들 -> 업로드 재생목록 id
+          const ch = await api('channels?part=contentDetails&' +
+            (HANDLE.startsWith('@') ? 'forHandle=' + encodeURIComponent(HANDLE)
+                                    : 'id=' + encodeURIComponent(HANDLE)));
+          const uploads = ch.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+          if (!uploads) throw new Error('채널을 못 찾았습니다: ' + HANDLE);
+
+          // 2) 최근 업로드 50개 (숏츠와 일반영상이 섞여 있음. 홈페이지에서 각자 걸러 씁니다)
+          const pl = await api('playlistItems?part=snippet&maxResults=50&playlistId=' + uploads);
+          const items = pl.items || [];
+
+          // 3) 재생시간 + 조회수 (여기서 숏츠/일반 구분이 가능해집니다)
+          const ids = items.map((i) => i.snippet?.resourceId?.videoId).filter(Boolean);
+          const det = ids.length
+            ? await api('videos?part=contentDetails,statistics&id=' + ids.join(','))
+            : { items: [] };
+          const byId = new Map((det.items || []).map((v) => [v.id, v]));
+
+          const videos = [];
+          for (const it of items) {
+            const sn = it.snippet || {};
+            const id = sn.resourceId?.videoId;
+            if (!id) continue;
+            const d = byId.get(id);
+            if (!d) continue;                 // 삭제했거나 비공개인 영상 -> 여기서 자동으로 빠집니다
+            const sec = toSec(d.contentDetails?.duration);
+            if (!sec) continue;               // 라이브 중이거나 아직 처리중인 영상
+            // 썸네일은 유튜브가 준 것 중 가장 큰 주소를 고릅니다 (카드에서 선명하게)
+            const t = sn.thumbnails || {};
+            const best = t.maxres || t.standard || t.high || t.medium || t.default;
+            videos.push({
+              id,
+              title: sn.title || '',
+              sec,
+              dur: toLabel(sec),
+              views: parseInt(d.statistics?.viewCount || '0', 10),
+              published: sn.publishedAt || '',
+              thumb: best?.url || ''
+            });
+          }
+
+          // 최신순 정렬 (홈페이지는 이 순서를 그대로 씁니다)
+          videos.sort((a, b) => (a.published < b.published ? 1 : a.published > b.published ? -1 : 0));
+
+          // 안전장치: 한 개도 못 받았으면 기존 파일을 건드리지 않고 실패시킵니다.
+          // (유튜브 장애나 키 문제로 홈페이지 목록이 통째로 비는 사고 방지)
+          if (!videos.length) throw new Error('영상이 하나도 안 왔습니다. 기존 파일을 그대로 두고 중단합니다.');
+
+          // itzip.js 가 있는 폴더를 찾아 그 옆에 저장합니다.
+          // 저장소 구조가 어떻든(루트든 itzip 폴더 안이든) 알아서 같은 자리에 놓입니다.
+          function findDir(dir, depth) {
+            if (depth > 3) return null;
+            let ents;
+            try { ents = readdirSync(dir, { withFileTypes: true }); } catch { return null; }
+            if (ents.some((e) => e.isFile() && e.name === 'itzip.js')) return dir;
+            for (const e of ents) {
+              if (!e.isDirectory()) continue;
+              if (e.name === '.git' || e.name === '.github' || e.name === 'node_modules') continue;
+              const hit = findDir(dir + '/' + e.name, depth + 1);
+              if (hit) return hit;
+            }
+            return null;
+          }
+          const out = (findDir('.', 0) || '.') + '/itzip-videos.json';
+
+          // 내용이 그대로면 저장하지 않습니다 (쓸데없는 커밋이 매시간 쌓이는 것 방지).
+          // 다만 조회수는 계속 변하므로, 24시간이 지나면 그때는 새로 씁니다.
+          let prev = null;
+          try { prev = JSON.parse(readFileSync(out, 'utf8')); } catch {}
+          const sig = (list) => JSON.stringify((list || []).map((v) => [v.id, v.title, v.dur, v.thumb]));
+          const aged = !prev?.updated || (Date.now() - Date.parse(prev.updated)) > 24 * 3600 * 1000;
+          if (prev && sig(prev.videos) === sig(videos) && !aged) {
+            console.log('바뀐 내용 없음 - 파일 그대로 둡니다.');
+            process.exit(0);
+          }
+
+          writeFileSync(out, JSON.stringify({
+            updated: new Date().toISOString(),
+            count: videos.length,
+            videos
+          }));
+
+          const shorts = videos.filter((v) => v.sec <= 60).length;
+          console.log('저장 완료: ' + out);
+          console.log('영상 ' + videos.length + '개 (숏츠 ' + shorts + ' / 일반 ' + (videos.length - shorts) + ')');
+          console.log('맨 앞: ' + videos[0].title);
+          SCRIPT
+          node fetch-youtube.mjs
+          rm -f fetch-youtube.mjs
+
+      - name: 바뀐 게 있으면 저장
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # itzip-videos.json 하나만 저장 대상으로 올립니다.
+          # 파일 이름을 콕 집어놨기 때문에, 설령 위 단계에서 무슨 일이 나더라도
+          # itzip.js / itzip.css / itzip-head.js 같은 기존 파일은 건드릴 수가 없습니다.
+          # (git add -A 였다면 작업 폴더의 모든 변화를 쓸어담으므로 그렇게 안 했습니다)
+          git add -- '*itzip-videos.json' 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "커밋할 변경 없음"
+          else
+            git commit -m "유튜브 목록 자동 갱신"
+            git push
+          fi
+          # 혹시라도 목록 파일 말고 다른 게 바뀌었다면 커밋하지 않고 여기서 알려만 줍니다.
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::warning::목록 파일 외 변경이 감지되어 커밋하지 않았습니다:"
+            git status --porcelain
+          fi
