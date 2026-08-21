@@ -206,5 +206,13 @@
 .izs-n{right:10px}
 
 /* 모바일에서는 .ck-content 가 화면 폭까지 벌어져 있으므로(랜딩 조각의 breakout) 좌우 24 를
-   margin 으로 직접 넣어 유튜브 카드·예약폼과 여백을 맞춥니다. */
-@media(max-width:768px){.izs{margin:24px}.izs-a{display:none}}
+   margin 으로 직접 넣어 유튜브 카드·예약폼과 여백을 맞춥니다.
+   탭은 옆으로 미는 대신 줄을 바꿔 전부 펼칩니다. 좁은 화면에서 옆으로 밀어야 하는 목록은
+   가려진 뒤쪽을 못 보고 지나치기 쉬운데, 타입은 전부 훑어보고 고르는 것이라 한눈에 다
+   보이는 편이 낫습니다. wrap 을 켜면 넘칠 일이 없으므로 스크롤 상자도 끕니다.
+   가운데정렬(safe center)은 위 기본 규칙 그대로라 줄마다 가운데로 섭니다. */
+@media(max-width:768px){
+  .izs{margin:24px}
+  .izs-a{display:none}
+  .izs-tabs{flex-wrap:wrap;overflow:visible}
+}

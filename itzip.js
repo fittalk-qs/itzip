@@ -1996,16 +1996,26 @@ window.fitReserve = function (mount) {
       go(way == 1 && Math.abs(dx) > 40 ? cur + (dx < 0 ? 1 : -1) : cur);
     }, true);
     rows[0].parentNode.insertBefore(box, rows[0]);
-    for (i = 0; i < rows.length; i++) { rows[i].setAttribute('data-izs', '1'); rows[i].style.display = 'none'; }
+    for (i = 0; i < rows.length; i++) { rows[i].setAttribute('data-izs', '1'); gone(rows[i]); }
     go(0);
     return 1;
+  }
+  // 원본을 감출 때 !important 를 같이 걸어야 합니다. 랜딩 조각이 모바일에서
+  //   @media(max-width:768px){ .productDetailPage #detail figure.image{display:block !important} }
+  // 를 걸어 두는데, 그냥 인라인 style.display='none' 은 !important 가 아니라서 이 규칙에
+  // 집니다. 그러면 PC 에서는 멀쩡한데 휴대폰에서만 슬라이더 아래에 원본 긴 이미지가
+  // 그대로 딸려 나옵니다. 인라인에 !important 를 붙이면 어떤 스타일시트보다 세므로
+  // 화면 크기와 상관없이 확실히 감춰집니다.
+  function gone(n) {
+    if (n.style.setProperty) n.style.setProperty('display', 'none', 'important');
+    else n.style.display = 'none';
   }
   function place() {
     var c = document.querySelector('.productDetailPage #detail .ck-content'), old, all, i, a = null;
     if (!c) return;
     // 큐샵이 상세설명을 다시 그리면 감춰 둔 원본이 되살아납니다. 그때는 다시 감춥니다.
     old = c.querySelectorAll('[data-izs]');
-    for (i = 0; i < old.length; i++) old[i].style.display = 'none';
+    for (i = 0; i < old.length; i++) gone(old[i]);
     all = marks(c);
     for (i = 0; i < all.length; i++) {
       if (all[i].k) { a = all[i]; continue; }   // 시작표시를 들고 있다가
