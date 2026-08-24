@@ -193,3 +193,154 @@
     window.NA_SEND('custom001');
   }, true);
 })();
+
+/* ===== itzip-head-6-crash.js ===== */
+// 화면 죽음 감시. 큐샵(Next.js)이 본문 자리에
+//     Application error: a client-side exception has occurred
+// 를 띄우면, 그 사실과 직전에 난 자바스크립트 오류를 GA4 로 보냅니다.
+//
+// 왜 이게 필요한가: 2026-08-24 에 이 화면 스크린샷 한 장만 받았는데 어느 페이지인지,
+// 무슨 오류인지, 브라우저가 무엇인지 아무것도 알 수 없었습니다. 콘솔을 볼 수 없는
+// 사람이 보는 화면이라 본인에게 물어봐도 나오는 것이 없습니다. 그래서 다음에 또 나면
+// 단서가 저절로 남게 합니다.
+//
+// 에러 화면의 실제 생김새는 이렇습니다. 헤더는 살아 있고 본문만 갈립니다.
+//   #main
+//    +- #headerSection            로고와 메뉴는 그대로 그려집니다
+//    +- div style="height:100vh"  이 안에 위 문구
+// 그래서 로고가 남아 있는 스크린샷도 이 오류가 맞습니다.
+//
+// 보내는 곳은 이미 깔려 있는 GA4(itzip-head-3-ga4.js) 입니다. 예약 웹훅을 쓰면 담당자
+// 휴대폰으로 문자가 나가 버리므로 절대 그쪽으로 보내지 않습니다.
+// GA4 실시간 화면에서는 app_crash 라는 이벤트 이름이 바로 보입니다. 안에 담은 값
+// (page, errs, ua ...)까지 보고서에 띄우려면 GA4 관리 - 맞춤 정의에서 같은 이름으로
+// 맞춤 측정기준을 한 번 만들어 주면 됩니다.
+//
+// 보고를 마친 뒤 한 번만 새로고침합니다. 가장 흔한 원인이 큐샵이 새 버전을 배포해서
+// 열어 두었던 탭이 옛 조각(chunk)을 못 받는 경우인데, 그때는 새로고침 한 번으로
+// 되살아납니다. 페이지 자체가 고장난 경우라면 다시 같은 화면이 나오지만 sessionStorage
+// 표시 때문에 두 번은 안 돕니다. 무한 새로고침은 일어나지 않습니다.
+// (같은 방식의 가드가 core-6-campaign-guard.js 에도 이미 있습니다.)
+//
+// 되돌리려면 이 조각 하나만 목록에서 빼고 다시 빌드하면 됩니다.
+(function () {
+  if (window.top !== window.self) return;   // 숨김 iframe 안에서는 세지 않습니다
+  var MARK = 'Application error';
+  var TAG = '[FIT CRASH]';
+  var RELOAD = 1;                            // 0 으로 두면 보고만 하고 새로고침은 안 합니다
+  var hits = [], logs = [], done = 0, timer = 0;
+
+  function note(s) {
+    s = String(s || '').slice(0, 200);
+    if (!s || hits.length >= 5) return;
+    for (var i = 0; i < hits.length; i++) if (hits[i] === s) return;   // 같은 오류 반복은 한 번만
+    hits.push(s);
+  }
+  // 캡처 단계로 답니다. 리소스 로드 실패(스크립트, 이미지)는 버블링을 안 하기 때문입니다.
+  window.addEventListener('error', function (e) {
+    if (e.message) note('js ' + e.message + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno);
+    else if (e.target && (e.target.src || e.target.href)) note('load ' + (e.target.src || e.target.href));
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    note('rej ' + ((r && (r.message || r.name)) || r));
+  });
+
+  // 리액트는 화면을 갈아치우기 전에 오류를 자기가 삼킵니다. 그래서 위의 error 이벤트로는
+  // 정작 원인이 안 올라옵니다. 실제로 2026-08-24 에 이 조각을 시험했을 때 오류를 일부러
+  // 냈는데도 errs 가 비어 있었습니다. 대신 리액트는 그 오류를 console.error 로 반드시 한 번
+  // 찍고 지나가므로 그쪽을 같이 엿봅니다.
+  //
+  // 마지막 세 줄만 굴려서 들고 있습니다. 큐샵도 평소에 console.error 를 쓰기 때문에, 전부
+  // 모으면 정작 중요한 마지막 한 줄이 앞의 잡소리에 밀려납니다. 원본 console.error 는 그대로
+  // 불러 주므로 개발자 도구에서 보이는 것은 달라지지 않습니다.
+  try {
+    var ce = console.error;
+    console.error = function () {
+      try {
+        if (arguments[0] !== TAG) {
+          var i, a, s;
+          for (i = 0; i < arguments.length && i < 3; i++) {
+            a = arguments[i];
+            if (a && a.stack) s = String(a.message || a) + ' <- ' + String(a.stack).split('\n').slice(1, 3).join(' ');
+            else if (typeof a === 'string') s = a;
+            else continue;
+            s = s.slice(0, 240);
+            if (s.length > 8 && logs[logs.length - 1] !== s) { logs.push(s); if (logs.length > 3) logs.shift(); }
+          }
+        }
+      } catch (e) {}
+      return ce.apply(console, arguments);
+    };
+  } catch (e) {}
+
+  // 에러 화면은 두 가지 모양으로 나옵니다. 2026-08-24 에 일부러 두 번 터뜨려서 둘 다 봤습니다.
+  //   가) #main 과 #headerSection 은 살아남고 그 밑에 에러 상자만 들어옵니다.
+  //       로고와 메뉴가 그대로 보입니다. 받았던 스크린샷이 이 모양이었습니다.
+  //   나) #main 이 통째로 없어지고 #__next 바로 밑에 에러 상자 하나만 남습니다.
+  //       완전한 백지입니다.
+  // 그래서 #main 만 보면 나) 를 놓칩니다. 두 자리를 다 봅니다.
+  //
+  // 문구는 들어 있는지만 봅니다. 앞에서부터 맞추면 안 됩니다. 에러 상자 안에는 style 태그가
+  // 먼저 들어 있어서 textContent 가 body{color:#000... 으로 시작하기 때문입니다.
+  function inside(p) {
+    if (!p) return 0;
+    var k = p.children, i;
+    for (i = 0; i < k.length; i++) {
+      if (k[i].id === 'headerSection' || k[i].id === 'main') continue;
+      if ((k[i].textContent || '').indexOf(MARK) >= 0) return 1;
+    }
+    return 0;
+  }
+  function dead() {
+    // 제목도 같이 저 문구로 바뀝니다. 두 모양 모두에서 그랬고 한 번에 끝나는 검사라
+    // 먼저 봅니다. DOM 검사는 큐샵이 제목을 되돌려 놓는 경우를 위한 보험입니다.
+    if (String(document.title || '').indexOf(MARK) === 0) return 1;
+    return inside(document.getElementById('__next')) || inside(document.getElementById('main'));
+  }
+
+  function report() {
+    if (done) return;
+    done = 1;
+    if (timer) clearInterval(timer);
+    var d = {
+      page: (location.pathname + location.search).slice(0, 120),
+      errs: hits.join(' | ') || '(window 오류 없음)',
+      logs: logs.join(' | ') || '(console 오류 없음)',   // 리액트가 삼킨 진짜 원인은 보통 여기
+      ua:   String(navigator.userAgent || '').slice(0, 160),
+      size: (document.documentElement.clientWidth || 0) + 'x' + (window.innerHeight || 0),
+      ref:  String(document.referrer || '').slice(0, 120)
+    };
+    try { console.error(TAG, d); } catch (e) {}   // TAG 로 보내야 위 엿보기가 자기 글을 안 줍습니다
+    try { localStorage.setItem('fitCrash', JSON.stringify(d)); } catch (e) {}   // 그 사람 PC 를 볼 수 있을 때용
+    try { if (window.gtag) window.gtag('event', 'app_crash', d); } catch (e) {}
+
+    // 주소 끝에 ?fitdebug=1 을 붙이고 들어오면 화면에도 띄웁니다. 우리끼리 재현할 때
+    // 콘솔을 열지 않고도 읽으려는 것입니다.
+    if (location.search.indexOf('fitdebug') >= 0) {
+      try {
+        var b = document.createElement('pre');
+        b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483000;margin:0;padding:12px;'
+          + 'background:#121318;color:#ffce6a;font:12px/1.5 monospace;white-space:pre-wrap;max-height:50vh;overflow:auto';
+        b.textContent = JSON.stringify(d, null, 2);
+        document.body.appendChild(b);
+      } catch (e) {}
+      return;                                   // 디버그 중에는 새로고침하지 않습니다
+    }
+
+    if (!RELOAD) return;
+    var key = 'fitCrashReload:' + location.pathname;
+    try {
+      if (sessionStorage.getItem(key)) return;  // 이 페이지는 이미 한 번 되살려 봤습니다
+      sessionStorage.setItem(key, '1');
+    } catch (e) { return; }                     // sessionStorage 가 막혀 있으면 절대 새로고침하지 않습니다
+    // GA4 가 나갈 틈을 준 뒤에 다시 받습니다. 캐시를 지나치는 새로고침이라야 옛 조각을
+    // 다시 잡지 않습니다.
+    setTimeout(function () { location.reload(); }, 1200);
+  }
+
+  // setInterval 입니다. requestAnimationFrame 은 탭이 뒤에 있거나 창이 가려지면 아예
+  // 안 불려서, 정작 오류가 난 화면을 못 볼 수 있습니다.
+  timer = setInterval(function () { if (dead()) report(); }, 800);
+  window.addEventListener('load', function () { if (dead()) report(); });
+})();
