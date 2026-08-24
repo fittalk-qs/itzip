@@ -180,6 +180,7 @@
   --izs-arrow:rgba(27,35,64,.5);     /* 화살표 동그라미 */
   --izs-arrow-on:rgba(27,35,64,.75); /* 화살표 동그라미(마우스 올렸을 때) */
   --izs-arrow-size:38px;             /* 화살표 지름 */
+  --izs-per:4;                       /* 한 줄에 몇 개 (표시에 한줄=N 을 적었을 때만 씀) */
   max-width:860px;margin:24px auto;text-align:left
 }
 
@@ -234,6 +235,16 @@
    적은 대로 섭니다. 아무것도 안 적으면 이 클래스가 안 붙어서 기본(반응형)입니다. */
 .izs-wrap .izs-tabs{flex-wrap:wrap;overflow:visible}
 .izs-roll .izs-tabs{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
+
+/* 한 줄에 몇 개로 못박기. 표시에 한줄=4 라고 적으면 js 가 izs-fix 를 붙이고 --izs-per 에 4 를
+   넣습니다. 탭 하나가 (전체폭 - 사이간격들) / 개수 를 차지하므로 줄마다 정확히 그 개수가
+   섭니다. 개수로 안 떨어지는 마지막 줄은 위 safe center 가 가운데로 모아 줍니다.
+   이름이 길어 칸을 넘치면 말줄임표로 자릅니다. 칸 폭이 고정이라 넘치면 줄이 어그러집니다. */
+.izs-fix .izs-tabs button{flex:0 0 calc((100% - var(--izs-gap) * (var(--izs-per) - 1)) / var(--izs-per));text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 이름 사이에 빗금(/)을 넣은 자리. 폭을 통째로 차지해 다음 탭을 아래 줄로 밀어냅니다.
+   높이가 0 이라 눈에는 안 보이고, gap 때문에 줄 간격만 살짝 벌어집니다. */
+.izs-br{flex:0 0 100%;height:0;margin:0;padding:0;border:0;background:none}
 .izs.izs-arw .izs-a{display:block}
 .izs.izs-noarw .izs-a{display:none}
 

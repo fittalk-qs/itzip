@@ -1806,7 +1806,10 @@ window.fitReserve = function (mount) {
   //   크기 모서리 간격 창모서리 화살표크기     숫자(px)
   //   여백                                   '세로 가로' 두 숫자. 보기: 여백=9 17
   //   배치      반응형(기본) | 줄바꿈 | 스크롤
+  //   한줄      한 줄에 몇 개로 끊을지. 보기: 한줄=4  (적으면 줄바꿈으로 칩니다)
   //   화살표    pc(기본) | 항상 | 없음
+  // 이름 사이에 빗금(/)을 끼우면 그 자리에서 줄을 바꿉니다. 한 줄에 몇 개씩 나누는 것으로는
+  // 안 되는 배치를 손으로 정할 때 씁니다.  보기: 75,84A,84B/84C,84D/102,124,166P
   // 안 적은 것은 기본값 그대로입니다. 오타는 조용히 무시합니다.
   //
   // 한 페이지에 여러 벌을 넣어도 됩니다. 시작과 끝을 짝지어 순서대로 다 만듭니다. 짝이 안
@@ -1843,10 +1846,23 @@ window.fitReserve = function (mount) {
     var m = new RegExp('\\[?\\s*' + w + '\\s*[:\uFF1A]?([^\\]\\n]*)').exec(s || '');
     return m ? m[1] : null;
   }
+  // 이름 목록. 쉼표로 나누고, 빗금(/)이 오면 그 다음 이름부터 새 줄에 놓습니다.
+  // 돌려주는 것은 {t:이름, br:앞에서 줄을 바꾸는가} 꾸러미들입니다.
   function names(s) {
-    var a = (s || '').split(/[,\uFF0C]/), r = [], i, v;
-    for (i = 0; i < a.length; i++) { v = a[i].replace(/^[\s\]]+|[\s\]]+$/g, ''); if (v) r.push(v); }
-    return r;
+    var out = [], buf = '', br = 0, i, ch;
+    s = String(s || '');
+    for (i = 0; i <= s.length; i++) {
+      ch = s.charAt(i);
+      if (i === s.length || ch === ',' || ch === '\uFF0C' || ch === '/') {
+        buf = buf.replace(/^[\s\]]+|[\s\]]+$/g, '');
+        if (buf) { out.push({ t: buf, br: br }); br = 0; }
+        buf = '';
+        if (ch === '/') br = 1;
+        continue;
+      }
+      buf += ch;
+    }
+    return out;
   }
   // 이름 뒤 막대(|)로 이어 붙인 설정을 뽑습니다.
   function opts(s) {
@@ -1877,6 +1893,13 @@ window.fitReserve = function (mount) {
     v = o['배치'];
     if (v === '줄바꿈') box.className += ' izs-wrap';
     else if (v === '스크롤' || v === '가로스크롤') box.className += ' izs-roll';
+    // 한 줄에 몇 개로 끊을지. 적으면 줄바꿈으로 칩니다. 탭 하나의 폭을 (100% - 사이간격) / 개수
+    // 로 못박아 두면 개수대로 딱 떨어지고, 남는 마지막 줄은 가운데로 모입니다.
+    v = o['한줄'];
+    if (v && /^\d+$/.test(v) && +v >= 1 && +v <= 12) {
+      box.className += ' izs-wrap izs-fix';
+      box.style.setProperty('--izs-per', String(+v));
+    }
     v = o['화살표'];
     if (v === '항상') box.className += ' izs-arw';
     else if (v === '없음' || v === '안함' || v === '끔') box.className += ' izs-noarw';
@@ -1995,11 +2018,18 @@ window.fitReserve = function (mount) {
       s.className = 'izs-s';
       s.style.paddingBottom = (b[i].d / b[i].w * 100).toFixed(3) + '%';
       g.crossOrigin = 'anonymous';
-      g.alt = nm ? nm[i] : '';
+      g.alt = nm ? nm[i].t : '';
       g.style.transform = 'translateY(' + (-b[i].y / b[i].h * 100).toFixed(4) + '%)';
       g.src = b[i].u;
       s.appendChild(g); track.appendChild(s);
-      e.type = 'button'; e.textContent = nm ? nm[i] : String(i + 1);
+      // 이름 앞에 빗금이 있었으면 여기서 줄을 바꿉니다. 폭을 다 차지하는 빈 조각을 끼우면
+      // 다음 탭이 아래 줄로 밀려납니다. flex 에서 줄을 끊는 가장 얌전한 방법입니다.
+      if (nm && i && nm[i].br) {
+        var br = document.createElement('i');
+        br.className = 'izs-br';
+        tabs.appendChild(br);
+      }
+      e.type = 'button'; e.textContent = nm ? nm[i].t : String(i + 1);
       e.onclick = (function (k) { return function () { go(k); }; })(i);
       tabs.appendChild(e); bt.push(e);
     }
