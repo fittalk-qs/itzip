@@ -1946,17 +1946,32 @@ window.fitReserve = function (mount) {
     }
     return null;                                 // 끝 표시가 시작보다 앞에 있으면 포기합니다
   }
-  // 픽셀을 읽으려면 CORS 로 받아 둔 그림이어야 합니다. 아직 아니면 모드를 바꿔 다시 물립니다.
-  // 슬라이드가 쓸 img 도 같은 주소에 같은 모드라 브라우저가 받아 둔 것을 그대로 씁니다.
-  // 그래서 12장이 원본 세 장을 나눠 써도 내려받는 것은 결국 세 장뿐입니다.
-  function ready(im, cb) {
-    if (im.crossOrigin && im.complete && im.naturalWidth) return cb(im);
-    function off() { im.removeEventListener('load', on); im.removeEventListener('error', er); }
-    function on() { off(); cb(im.naturalWidth ? im : null); }
-    function er() { off(); cb(null); }
-    im.addEventListener('load', on);
-    im.addEventListener('error', er);
-    if (!im.crossOrigin) { var u = im.src; im.crossOrigin = 'anonymous'; im.src = u; }
+  // 픽셀을 읽으려면 CORS 로 받은 그림이어야 합니다. 읽기용으로 한 장을 따로 받습니다.
+  //
+  // 예전에는 페이지에 이미 떠 있는 img 에 crossOrigin 을 붙이고 src 를 다시 넣어, 그 한 장
+  // 으로 읽기와 보여주기를 같이 했습니다. 그것이 2026-08-25 에 잡힌 '타입 안내가 기기마다
+  // 안 뜬다' 의 원인이었습니다. cdn.qshop.ai 는 Origin 을 달고 온 요청에만 헤더를 붙입니다.
+  //   Origin 있음 : Access-Control-Allow-Origin: *  +  Vary: Origin
+  //   Origin 없음 : (헤더 없음)                        Vary 도 없음
+  // 페이지는 그 그림을 먼저 평범하게(Origin 없이) 받아 둡니다. Vary 가 없으니 브라우저는
+  // 그 판을 CORS 요청에도 그냥 내주고, 헤더가 없으므로 CORS 검사에 걸려 load 가 실패합니다.
+  // 실패한 곳이 화면에 보이던 그 img 라서 **원본 이미지가 그 자리에서 깨졌습니다.** 게다가
+  // 읽을 것이 없으니 슬라이더도 못 만들고 [슬라이드시작:...] 글자만 덩그러니 남았습니다.
+  // 캐시(브라우저의 것이든 CloudFront 그 지역의 것이든)가 어느 판을 들고 있느냐에 달린
+  // 일이라, 같은 페이지가 기기마다 브라우저마다 될 때도 있고 안 될 때도 있었습니다.
+  //
+  // 그래서 페이지의 img 는 이제 건드리지 않습니다. 주소 끝에 izs=1 을 붙여 평범한 판과
+  // 캐시 자리를 갈라 놓고 새 Image 로 받습니다. 고정된 주소라 두 번째부터는 이것도 캐시에서
+  // 옵니다(무작위 숫자를 붙이면 안 되는 이유입니다). 실패해도 화면에는 아무 일이 없습니다.
+  // 슬라이드가 쓸 img 는 반대로 crossOrigin 없이 원래 주소 그대로 씁니다. 픽셀을 읽을 일이
+  // 없으니 CORS 가 필요 없고, 페이지가 이미 받아 둔 것을 그대로 써서 더 내려받지 않습니다.
+  function probe(im, cb) {
+    var u = im.currentSrc || im.src, p = new Image();
+    if (!u) return cb(null);
+    p.crossOrigin = 'anonymous';
+    p.addEventListener('load', function () { cb(p.naturalWidth ? p : null); });
+    p.addEventListener('error', function () { cb(null); });
+    p.src = u + (u.indexOf('?') < 0 ? '?' : '&') + 'izs=1';
   }
   // 한 장이 시작하는 y 들. 못 읽으면(그림이 있는 곳이 CORS 를 안 열어 준 경우) 통째로 한 장
   // 으로 봅니다. 나눌 곳을 못 찾았을 때도 마찬가지입니다.
@@ -1991,11 +2006,11 @@ window.fitReserve = function (mount) {
     var b, one = [], many = [], i, im, t, j, box, tabs, view, track, prev, next, cur = 0, bt = [];
     for (i = 0; i < list.length; i++) {
       if (!list[i]) continue;
-      im = list[i].im; t = list[i].cuts;
+      im = list[i]; t = im.cuts;
       // 두 가지로 세어 둡니다. one = 이미지 한 장이 곧 한 장, many = 나눈 것
-      one.push({ u: im.src, w: im.naturalWidth, h: im.naturalHeight, y: 0, d: im.naturalHeight });
+      one.push({ u: im.u, w: im.w, h: im.h, y: 0, d: im.h });
       for (j = 0; j < t.length; j++)
-        many.push({ u: im.src, w: im.naturalWidth, h: im.naturalHeight, y: t[j], d: (j + 1 < t.length ? t[j + 1] : im.naturalHeight) - t[j] });
+        many.push({ u: im.u, w: im.w, h: im.h, y: t[j], d: (j + 1 < t.length ? t[j + 1] : im.h) - t[j] });
     }
     // 이름을 적어 주었으면 그 개수가 곧 '몇 장이어야 하는가' 입니다. 나눈 쪽이 그 수와 다르고
     // 안 나눈 쪽이 딱 맞으면, 이미 타입별로 잘라 올린 현장이라는 뜻이므로 나누지 않습니다.
@@ -2017,8 +2032,7 @@ window.fitReserve = function (mount) {
       var s = document.createElement('div'), g = document.createElement('img'), e = document.createElement('button');
       s.className = 'izs-s';
       s.style.paddingBottom = (b[i].d / b[i].w * 100).toFixed(3) + '%';
-      g.crossOrigin = 'anonymous';
-      g.alt = nm ? nm[i].t : '';
+      g.alt = nm ? nm[i].t : '';       // crossOrigin 은 일부러 안 겁니다. probe() 설명 참고
       g.style.transform = 'translateY(' + (-b[i].y / b[i].h * 100).toFixed(4) + '%)';
       g.src = b[i].u;
       s.appendChild(g); track.appendChild(s);
@@ -2118,12 +2132,23 @@ window.fitReserve = function (mount) {
     for (i = 0; i < rows.length; i++) rows[i].__izs = 1;   // 임자 표시. 기다리기 전에 박습니다
     left = ims.length;
     for (i = 0; i < ims.length; i++) grab(i);
+    // 크기는 읽기용 그림에서 얻되, 못 받았으면 페이지의 img 에서 가져옵니다. 큐샵은 상세설명
+    // img 에 width/height 를 늘 적어 주므로 그림이 아직 안 떴어도 크기는 알 수 있습니다.
+    // 픽셀을 못 읽었으면 나누지 않고 한 장을 한 장으로 씁니다. 이러면 CORS 가 막힌 곳에서도
+    // (이미 타입별로 잘라 올린 현장이라면 그대로, 긴 이미지 현장이라면 번호 탭으로) 슬라이더가
+    // 서기는 합니다. 예전처럼 통째로 아무것도 안 하는 것보다 낫습니다.
     function grab(k) {
-      ready(ims[k], function (im) {
-        list[k] = im ? { im: im, cuts: cuts(im) } : null;
+      var im = ims[k];
+      probe(im, function (p) {
+        var w = (p && p.naturalWidth) || im.naturalWidth || +im.getAttribute('width') || 0,
+            h = (p && p.naturalHeight) || im.naturalHeight || +im.getAttribute('height') || 0;
+        list[k] = (w && h) ? { u: im.currentSrc || im.src, w: w, h: h, cuts: p ? cuts(p) : [0] } : null;
         if (--left) return;
         // 이름은 막대(|) 앞까지만입니다. 뒤쪽은 모양 설정입니다.
-        if (!build(names(String(a.s).split('|')[0]), opts(a.s), rows, list)) return;
+        build(names(String(a.s).split('|')[0]), opts(a.s), rows, list);
+        // 만들었든 못 만들었든 표시 글자는 지웁니다. 남겨 두면 슬라이더가 안 선 페이지에
+        // [슬라이드시작:59A,...] 이 그대로 보입니다. 못 만들었으면 원본 이미지가 그대로
+        // 있으므로 표시만 사라진 평범한 상세설명이 됩니다.
         drop(a.at); drop(z.at);
       });
     }
@@ -2133,11 +2158,17 @@ window.fitReserve = function (mount) {
   }
   // 상세설명은 큐샵이 나중에 그려 넣으므로 한 번만 훑으면 놓칩니다. 변경을 다음 프레임
   // 한 번으로 모아서 처리합니다.
+  // 타이머를 같이 거는 이유: requestAnimationFrame 은 탭이 뒤에 있거나 화면이 꺼져 있으면
+  // 아예 안 불립니다. 링크를 새 탭으로 열어 두었다가 나중에 보는 경우, 저전력 모드의 아이폰,
+  // 미리 불러오기(prerender)로 뜬 페이지가 그렇습니다. 그러면 슬라이더가 영영 안 섭니다.
+  // 둘 중 먼저 오는 쪽이 한 번만 일합니다.
   var q = 0;
   function scan() {
     if (q) return;
     q = 1;
-    (window.requestAnimationFrame || function (f) { setTimeout(f, 16); })(function () { q = 0; place(); });
+    function run() { if (!q) return; q = 0; place(); }
+    (window.requestAnimationFrame || function (f) { setTimeout(f, 16); })(run);
+    setTimeout(run, 120);
   }
   scan();
   try { new MutationObserver(scan).observe(document.documentElement, { childList: 1, subtree: 1 }); } catch (e) {}
