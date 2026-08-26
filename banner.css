@@ -1,0 +1,150 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+
+/* 메인홈 아코디언 띠 배너 — 생김새.
+   구조는 banner.js 가 banner.json 을 읽어서 만듭니다. 글자·사진을 바꿀 때 이 파일은
+   건드리지 않습니다. 잇집 메이커에서 만든 json 만 갈아끼우면 됩니다.
+
+     div.acb                    배너 전체. --pn-n 에 패널 개수가 들어갑니다
+       section.pn(.on)          패널 하나. 접히면 띠 폭, 펼치면 남는 폭 전부
+         div.pn-bg              배경 사진 (띠 아래까지 깔림)
+         div.pn-main
+           div.pn-scrim         왼쪽을 어둡게 덮어 글자를 읽히게 하는 층
+           div.pn-body          글자
+         button.pn-strip        접혔을 때 보이는 세로 띠
+
+   패널 개수가 4개로 고정이 아니어서 .pn-body 폭 계산에 --pn-n 을 씁니다. 예전 코드는
+   4 를 박아 두어서 패널을 3개나 5개로 바꾸면 글 상자가 띠를 밀고 나갔습니다. */
+
+html,body{margin:0;padding:0;background:transparent;color:#1b1b1b;
+  font-family:'Pretendard','Apple SD Gothic Neo',-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box}
+
+:root{
+  --brand:#3700ff;                   /* 사이트 시그니처 */
+  --brand-soft:#aab8ff;              /* 어두운 배경 위에서 읽히는 옅은 톤 */
+  --stripw:clamp(88px,8.5vw,132px);  /* 접힌 패널(=띠) 폭 */
+}
+
+.acb{display:flex;overflow:hidden;background:#fff;border:1px solid #e6e9f2;--pn-n:4}
+/* json 을 받기 전에는 아무것도 안 보이게. 빈 흰 상자가 깜빡이는 것을 막습니다. */
+.acb:empty{border:0}
+
+/* 접힘 = 띠 폭, 펼침 = flex-grow. basis 가 고정이라 grow 만 애니메이션합니다. */
+.pn{position:relative;display:flex;min-width:0;min-height:0;overflow:hidden;flex:0 0 var(--stripw);
+  transition:flex-grow .75s cubic-bezier(.65,.05,.18,1)}
+.pn.on{flex-grow:1}
+
+.pn-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:60% center;background-color:#262836}
+/* 평면 썸네일을 눌렀을 때 배경을 겹쳐 놓고 서서히 바꾸는 임시 층 (JS 가 만들고 지웁니다) */
+.pn-bgfade{position:absolute;inset:0;z-index:0;background-size:cover;background-position:60% center;
+  opacity:0;transition:opacity .5s ease}
+.pn-bgfade.show{opacity:1}
+
+.pn-main{order:1;flex:1 1 auto;position:relative;min-width:0;min-height:0;overflow:hidden;z-index:1}
+.pn-scrim{position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(8,8,14,.93) 0%,rgba(8,8,14,.72) 38%,rgba(8,8,14,.18) 75%,rgba(8,8,14,0))}
+
+.pn-body{position:relative;height:100%;display:flex;flex-direction:column;justify-content:center;
+  padding:44px 40px 40px clamp(28px,4vw,64px);
+  width:min(620px,calc(min(100vw,1200px) - var(--pn-n) * var(--stripw) - 32px));
+  opacity:0;transform:translateX(18px);transition:opacity .35s ease,transform .35s ease}
+.pn.on .pn-body{opacity:1;transform:none;
+  transition:opacity .5s ease .3s,transform .55s cubic-bezier(.2,.7,.2,1) .3s}
+
+.eyebrow{font-size:15px;font-weight:600;letter-spacing:.01em;color:#eee}
+.eyebrow::after{content:"";display:block;width:44px;height:2px;
+  background:linear-gradient(90deg,var(--brand),var(--brand-soft));margin-top:10px}
+.pn-title{margin:22px 0 0;font-size:clamp(30px,4.4vw,56px);font-weight:800;line-height:1.18;
+  letter-spacing:-.02em;color:#fff}
+.pn-sub{margin:18px 0 0;font-size:clamp(15px,1.4vw,18px);line-height:1.7;color:rgba(255,255,255,.88)}
+
+/* 아이콘 줄 */
+.feat{display:flex;flex-direction:column;gap:16px;margin-top:22px;padding:0}
+.feat li{display:flex;gap:14px;align-items:flex-start;list-style:none;font-size:15px;line-height:1.55;
+  color:rgba(255,255,255,.9)}
+.feat .ic{flex:0 0 34px;height:34px;display:grid;place-items:center;color:#fff}
+.feat .ic svg{width:30px;height:30px;display:block}
+
+/* 평면 */
+.plan-size{margin:14px 0 0;font-size:clamp(22px,2vw,28px);font-weight:700;color:#fff}
+.plan-desc{margin-top:8px}
+@keyframes planSwap{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.plan-size.swap{animation:planSwap .4s ease}
+.plan-desc.swap{animation:planSwap .45s ease}
+.plan-thumbs{display:flex;gap:14px;margin-top:18px;flex-wrap:wrap}
+.plan-thumbs .t{width:76px;text-align:center;font-size:12px;color:rgba(255,255,255,.85);cursor:pointer}
+.plan-thumbs .box{height:64px;border-radius:8px;margin-bottom:6px;
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 1px,transparent 1px 14px),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.18) 0 1px,transparent 1px 12px),#262836;
+  border:1px solid rgba(255,255,255,.18);
+  transition:transform .25s ease,border-color .25s,box-shadow .25s}
+/* 평면도는 대개 흰 바탕이라 이미지가 들어간 칸은 밝은 바탕으로 깔아 줍니다 */
+.plan-thumbs .box.has-img{background-color:#f4f5f9;background-size:contain;
+  background-position:center;background-repeat:no-repeat}
+.plan-thumbs .t:hover .box{transform:translateY(-2px)}
+.plan-thumbs .t.sel .box{border:2px solid var(--brand-soft);box-shadow:0 0 0 3px rgba(55,0,255,.35);
+  transform:translateY(-3px)}
+
+/* 칩 + 버튼 */
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+.chips span{border:1px solid rgba(255,255,255,.4);border-radius:8px;padding:7px 13px;
+  font-size:13px;color:rgba(255,255,255,.92);white-space:nowrap}
+.cta{margin-top:18px;align-self:flex-start;display:inline-flex;align-items:center;gap:12px;
+  border:1px solid rgba(255,255,255,.65);border-radius:10px;background:transparent;color:#fff;
+  padding:13px 22px;font-size:18px;font-weight:600;cursor:pointer;font-family:inherit;
+  text-decoration:none;transition:background .25s,color .25s,border-color .25s}
+/* 화살표는 글자보다 한 톤 작게. em 이라 .cta 글자 크기만 바꾸면 같이 따라옵니다. */
+.cta span{font-size:.78em;line-height:1}
+.cta:hover{background:var(--brand);border-color:var(--brand);color:#fff}
+
+/* 띠. 호버는 그라데이션 → 그라데이션으로만 바꿉니다. 단색에 transition 을 걸면 배경색이
+   투명에서 차오르는 동안 뒤가 비쳐 보이는 깜빡임이 생깁니다. */
+.pn-strip{order:0;flex:0 0 var(--stripw);display:flex;flex-direction:column;align-items:center;
+  padding:26px 0 20px;cursor:pointer;border:0;font-family:inherit;color:#1b1b1b;position:relative;z-index:2;
+  background:#fff;box-shadow:inset 1px 0 0 #e6e9f2}
+.pn-strip:hover{background:linear-gradient(180deg,#f2f4f9,#e9ecf4)}
+.pn-strip .no{font-size:16px;font-weight:800;color:var(--brand);letter-spacing:.04em}
+.pn-strip .lb{margin-top:18px;writing-mode:vertical-rl;text-orientation:upright;
+  font-size:15px;font-weight:700;letter-spacing:.32em;line-height:1;color:#1b1b1b}
+/* "더 보기"와 화살표가 한 덩어리로 바닥에 붙도록 margin-top:auto 는 .more 가 가집니다 */
+.pn-strip .more{margin-top:auto;font-size:12px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;color:#1b1b1b;transition:color .3s}
+.pn-strip .ar{margin-top:8px;width:30px;height:30px;border:1px solid rgba(27,27,27,.35);border-radius:50%;
+  display:grid;place-items:center;font-size:14px;color:#1b1b1b;
+  transition:transform .3s,background .3s,color .3s,border-color .3s}
+.pn:hover .pn-strip .ar{background:var(--brand);border-color:var(--brand);color:#fff}
+.pn:hover .pn-strip .more{color:var(--brand)}
+.pn.on .pn-strip .ar{transform:rotate(180deg)}
+.pn.on .pn-strip{box-shadow:inset -3px 0 0 var(--brand),inset 1px 0 0 #e6e9f2}
+
+/* 모바일: 세로 아코디언 */
+@media (max-width:760px){
+  :root{--striph:56px}
+  .acb{flex-direction:column;height:min(185vw,720px)}
+  .pn{flex-direction:column;flex-basis:var(--striph);transition:flex-grow .6s cubic-bezier(.65,.05,.18,1)}
+  .pn-strip{order:0;flex:0 0 var(--striph);flex-direction:row;align-items:center;gap:12px;
+    padding:0 18px;width:100%;background:linear-gradient(180deg,#fbfcfe,#f1f3f9);
+    box-shadow:inset 0 1px 0 #e6e9f2}
+  .pn-strip .lb{writing-mode:horizontal-tb;text-orientation:mixed;margin-top:0;letter-spacing:.12em;font-size:14px}
+  .pn-strip .more{margin-top:0;margin-left:auto;font-size:13px}
+  .pn-strip .ar{margin-top:0;margin-left:0;width:26px;height:26px;font-size:12px}
+  .pn.on .pn-strip{box-shadow:inset 0 -3px 0 var(--brand),inset 0 1px 0 #e6e9f2}
+  .pn-body{width:100%;padding:20px 18px;justify-content:flex-end}
+  .pn-title{font-size:28px;margin-top:12px}
+  .pn-sub{font-size:14px;margin-top:12px}
+  .chips{margin-top:16px;gap:8px}
+  .chips span{padding:6px 10px;font-size:12px}
+  .cta{margin-top:14px;padding:11px 18px;font-size:16px}
+  .feat{gap:12px;margin-top:16px}
+  .feat li{font-size:14px}
+  .plan-thumbs{margin-top:12px}
+  .plan-thumbs .t{width:64px}
+  .plan-thumbs .box{height:52px}
+  .plan-size{margin-top:10px;font-size:20px}
+  .pn-scrim{background:linear-gradient(0deg,rgba(8,8,14,.94) 0%,rgba(8,8,14,.6) 55%,rgba(8,8,14,.15))}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .pn,.pn-body{transition:none}
+}

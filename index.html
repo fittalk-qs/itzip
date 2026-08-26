@@ -1,0 +1,661 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>핏톡의 마법도구</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+/* 핏톡의 마법도구 — 사내 도구함.
+
+   우리 직원만 보는 화면이라 딱딱하지 않게 만들었습니다. 크림색 바탕 + 테두리가
+   또렷한 스티커 카드 + 파스텔. 색은 도구마다 다르게 줘서 "코랄이 배너, 민트가 평면,
+   라일락이 보고폼"처럼 색으로 기억되게 했습니다.
+
+   도구가 잇집 전용인 것과 어디서나 쓰는 것으로 갈려서 구역을 나눠 뒀습니다.
+   보고폼 변환기는 현장 어디에나 쓰므로 아래 칸에 있습니다.
+
+   그림자는 opacity 없는 단색 오프셋(4px 4px 0)입니다. 흐린 그림자를 쓰면 스티커가
+   아니라 그냥 카드로 보입니다. */
+:root{
+  --cream:#fff7ee;
+  --paper:#fff;
+  --ink:#4a3a30;          /* 검정 대신 따뜻한 갈색 — 이것만으로 인상이 부드러워집니다 */
+  --ink-2:#8a7566;
+  --line:#eadccb;
+  --coral:#ff8a6b;
+  --mint:#5fd3b4;
+  --butter:#ffce5c;
+  --lilac:#b9a0ff;
+  --grape:#7c5cff;        /* 라일락은 옅어서 글자에 못 씁니다. 글자용 진한 짝 */
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:var(--cream);
+  background-image:radial-gradient(#efe1d1 1.6px,transparent 1.6px);
+  background-size:24px 24px;
+  font-family:'Pretendard','Malgun Gothic',sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:900px;margin:0 auto;padding:0 20px}
+
+/* ── 머리띠 ────────────────────────────────────────────────────────── */
+/* 화면 끝까지 가는 라벤더 띠. 아래를 2px 잉크선으로 끊어 종이 두 장을 겹친 느낌을 냅니다. */
+.hero{position:relative;overflow:hidden;background:#efe6ff;border-bottom:2px solid var(--ink);
+  background-image:radial-gradient(#ddd0f7 1.6px,transparent 1.6px);background-size:24px 24px}
+.hero .wrap{position:relative}
+.head{padding:38px 0 36px;display:flex;align-items:center;gap:22px}
+.face{flex:0 0 auto;animation:bob 3.6s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:rotate(-3deg) translateY(0)}50%{transform:rotate(3deg) translateY(-4px)}}
+.head h1{font-size:clamp(30px,5vw,40px);font-weight:800;letter-spacing:-.025em;margin:6px 0 12px;
+  line-height:1.15}
+.head h1 em{font-style:normal;color:var(--grape)}
+
+/* 반짝이 — 마법 느낌은 이 셋이 다 냅니다. 위치는 눈대중이라 겹치면 옮겨도 됩니다. */
+.spark{position:absolute;pointer-events:none;animation:tw 2.6s ease-in-out infinite}
+.spark.b{animation-delay:.9s}
+.spark.c{animation-delay:1.7s}
+@keyframes tw{0%,100%{opacity:.3;transform:scale(.8) rotate(-8deg)}
+  50%{opacity:1;transform:scale(1.1) rotate(8deg)}}
+@media(max-width:640px){.spark{display:none}}
+
+/* 말풍선 — 설명글이 마스코트가 하는 말처럼 보이게.
+   꼬리는 왼쪽(마스코트 쪽)을 향합니다. 위로 세우면 아무것도 없는 허공을 가리킵니다.
+   테두리색 삼각형 위에 종이색 삼각형을 살짝 겹쳐서 2px 선이 이어져 보이게 합니다. */
+.bubble{position:relative;display:inline-block;background:var(--paper);
+  border:2px solid var(--ink);border-radius:16px;padding:12px 16px;
+  box-shadow:3px 3px 0 var(--ink);font-size:13.5px;line-height:1.75;max-width:34em}
+.bubble::before,.bubble::after{content:"";position:absolute;width:0;height:0;border-style:solid}
+.bubble::before{left:-14px;top:15px;border-width:9px 14px 9px 0;
+  border-color:transparent var(--ink) transparent transparent}
+.bubble::after{left:-10px;top:18px;border-width:6px 10px 6px 0;
+  border-color:transparent var(--paper) transparent transparent}
+.bubble b{background:linear-gradient(180deg,transparent 62%,#ffe0a8 62%);font-weight:700}
+
+/* ── 구역 이름 = 알약 배지 ─────────────────────────────────────────── */
+.sec{display:flex;align-items:center;gap:10px;margin:0 0 15px}
+.sec b{font-size:11.5px;font-weight:800;letter-spacing:.06em;background:var(--ink);color:var(--cream);
+  border-radius:999px;padding:5px 13px}
+.sec em{font-style:normal;font-size:12px;color:var(--ink-2)}
+
+/* ── 도구 카드 ─────────────────────────────────────────────────────── */
+/* 카드 머리의 색 띠 = 배너가 휴대폰에서 접혔을 때 보이는 가로 띠입니다.
+   색은 카드마다 --c 로 다르게 줘서 "코랄이 배너, 민트가 평면"으로 기억되게 했습니다. */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 34px}
+@media(max-width:700px){.cards{grid-template-columns:1fr}}
+.card{display:flex;flex-direction:column;text-decoration:none;color:inherit;
+  background:var(--paper);border:2px solid var(--ink);border-radius:20px;overflow:hidden;
+  box-shadow:4px 4px 0 var(--ink);
+  transition:transform .16s cubic-bezier(.34,1.6,.5,1),box-shadow .16s}
+.card:hover{transform:translate(-3px,-3px);box-shadow:7px 7px 0 var(--ink)}
+.card:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+
+.card .cap{display:flex;align-items:center;gap:9px;padding:10px 14px;
+  border-bottom:2px solid var(--ink);background:var(--c,var(--coral))}
+.card .cap .no{font-size:13px;font-weight:800;letter-spacing:.08em}
+.card .cap .nm{font-size:12.5px;font-weight:800;letter-spacing:.14em}
+.card .cap i{margin-left:auto;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  border:2px solid var(--ink);background:var(--paper);font-style:normal;font-size:13px;font-weight:700;
+  transition:transform .16s}
+.card:hover .cap i{transform:translateX(3px) rotate(10deg)}
+
+.card .body{flex:1;display:flex;flex-direction:column;padding:17px 17px 15px}
+.card h2{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:0 0 7px}
+.card p{font-size:13px;line-height:1.7;color:var(--ink-2);margin:0 0 14px}
+.card .to{align-self:flex-start;margin-top:auto;display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:700;color:var(--ink-2);background:var(--cream);
+  border:1.5px solid var(--line);border-radius:999px;padding:5px 11px}
+.card .to em{font-style:normal;color:var(--ink)}
+.card .to em.mono{font-family:ui-monospace,Consolas,monospace;font-size:11px}
+
+@media(max-width:640px){
+  .head{gap:14px}
+  .card h2{font-size:17px}
+}
+
+/* ── 빠른 도구 ─────────────────────────────────────────────────────── */
+.panel{background:var(--paper);border:2px solid var(--ink);border-radius:20px;overflow:hidden;
+  box-shadow:4px 4px 0 var(--ink);margin:0 0 30px}
+.panel .hd{padding:16px 20px 14px;border-bottom:2px solid var(--ink);background:var(--c,var(--butter))}
+.panel .hd h2{font-size:17px;font-weight:800;letter-spacing:-.02em;margin:0 0 3px}
+/* 머리 색이 버터든 라일락이든 같은 갈색으로 읽힙니다. 색마다 글자색을 따로 잡으면
+   도구를 하나 더 넣을 때마다 색을 또 골라야 합니다. */
+.panel .hd p{font-size:12.5px;margin:0;line-height:1.6;color:rgba(74,58,48,.72)}
+.panel .bd{padding:18px 20px 20px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+/* min-width:0 이 없으면 1fr 칸이 안쪽 내용의 min-content 만큼 부풀어서, 한 칸으로 접힌
+   휴대폰에서도 칸이 화면보다 넓어집니다(가로 스크롤이 생깁니다). */
+.grid2>div{min-width:0}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.lg{font-size:11.5px;font-weight:800;margin:0 0 8px;display:flex;align-items:center;gap:7px}
+.lg .cnt{font-weight:800;color:var(--coral)}
+
+textarea{width:100%;padding:11px 12px;border:2px solid var(--ink);border-radius:14px;font:inherit;
+  font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.65;background:var(--cream);
+  color:var(--ink);resize:vertical;transition:background .15s,box-shadow .15s}
+textarea::placeholder{color:#c3b3a4}
+textarea:focus{outline:0;background:#fff;box-shadow:3px 3px 0 var(--lilac)}
+button{font:inherit;cursor:pointer;border-radius:999px;border:2px solid var(--ink);background:var(--paper);
+  padding:6px 13px;font-size:12px;font-weight:700;color:var(--ink);
+  box-shadow:2px 2px 0 var(--ink);transition:transform .13s,box-shadow .13s,background .13s}
+button:hover{background:var(--cream);transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+button:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--ink)}
+button.go2{background:var(--mint);padding:9px 17px;font-size:13px}
+button.go2:hover{background:var(--mint)}
+button.done{background:var(--butter)}
+.bar{display:flex;gap:8px;align-items:center;margin-top:11px;flex-wrap:wrap}
+
+.res{border:2px dashed var(--line);border-radius:14px;background:var(--cream);padding:5px 12px;
+  min-height:122px}
+.row{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1.5px dashed var(--line)}
+.row:first-child{border-top:0}
+.row img{width:56px;height:32px;flex:0 0 56px;object-fit:cover;border-radius:7px;
+  border:1.5px solid var(--ink);background:#efe1d1}
+.row .u{flex:1;min-width:0;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .n{flex:0 0 auto;font-size:11px;font-weight:800;color:#c3b3a4;width:13px;text-align:right}
+.row button{padding:4px 10px;font-size:11px;box-shadow:1.5px 1.5px 0 var(--ink)}
+.empty{font-size:12.5px;color:#b5a496;padding:19px 4px;margin:0;line-height:1.75}
+.bad{margin:11px 0 0;padding:11px 13px;background:#ffeae4;border:2px solid var(--coral);
+  border-radius:14px;font-size:12px;color:#a8442a;line-height:1.7}
+.bad b{display:block;margin-bottom:3px}
+.bad code{font-family:ui-monospace,Consolas,monospace;background:#fff;padding:1px 4px;border-radius:4px}
+.dup{font-size:11.5px;color:var(--ink-2);margin:9px 0 0}
+
+.why{margin:17px 0 0;padding:14px 16px;background:var(--cream);border:1.5px solid var(--line);
+  border-radius:14px;font-size:12px;color:var(--ink-2);line-height:1.9}
+.why b{color:var(--ink)}
+.why code{font-family:ui-monospace,Consolas,monospace;background:#fff;border:1.5px solid var(--line);
+  padding:1px 5px;border-radius:5px;font-size:11.5px;color:var(--ink)}
+
+/* ── 보고폼 변환기 ─────────────────────────────────────────────────── */
+input[type=text]{width:100%;padding:10px 12px;border:2px solid var(--ink);border-radius:14px;
+  font:inherit;font-size:12.5px;background:var(--cream);color:var(--ink);
+  transition:background .15s,box-shadow .15s}
+input[type=text]::placeholder{color:#c3b3a4}
+input[type=text]:focus{outline:0;background:#fff;box-shadow:3px 3px 0 var(--lilac)}
+input.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
+.stack>*+*{margin-top:15px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(max-width:700px){.two,.fields{grid-template-columns:1fr}}
+.fields .hint{display:block;font-size:10.5px;font-weight:600;color:#b5a496;margin-top:5px}
+/* 보고 대상 고르기. 셋의 차이는 인사말과 어드민 안내 유무, 그 둘뿐입니다. */
+.modes{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 10px}
+.modes button.on{background:var(--lilac)}
+.modes button span{font-weight:600;font-size:10.5px;opacity:.72;margin-left:4px}
+/* 높이는 JS 가 줄 수에 맞춰 rows 로 잡습니다. 짧은 버전(홈페이지 한 줄)일 때
+   빈 상자가 한참 남지 않게. */
+#rfOut{background:#fffdf8}
+.warn{margin:11px 0 0;padding:11px 13px;background:#fff5e0;border:2px solid var(--butter);
+  border-radius:14px;font-size:12px;color:#7a5f22;line-height:1.75}
+.warn b{display:block;margin-bottom:2px}
+.warn code{font-family:ui-monospace,Consolas,monospace;background:#fff;padding:1px 5px;border-radius:4px}
+
+/* 판 번호와 만든 사람. 도구가 늘거나 바뀌면 여기 v 를 올려 주세요 —
+   팀원이 "내가 보는 게 최신인가"를 확인하는 유일한 자리입니다. */
+.foot{margin:0;padding:6px 0 48px;text-align:center}
+.foot .tag{display:inline-flex;align-items:center;gap:9px;background:var(--paper);
+  border:2px solid var(--ink);border-radius:999px;padding:7px 15px;font-size:11.5px;
+  font-weight:700;color:var(--ink-2);box-shadow:2px 2px 0 var(--ink)}
+.foot .tag b{color:var(--ink)}
+.foot .tag .v{background:var(--butter);border:1.5px solid var(--ink);border-radius:999px;
+  padding:2px 8px;font-size:10.5px;color:var(--ink)}
+.foot .tag s{width:1px;height:12px;background:var(--line);text-decoration:none}
+.foot .sub{margin:11px 0 0;font-size:11px;color:#b5a496}
+.foot .sub code{font-family:ui-monospace,Consolas,monospace}
+
+@media(prefers-reduced-motion:reduce){
+  .face{animation:none}
+  .tool,.tool .go i,button{transition:none}
+}
+</style>
+
+<div class=hero><div class=wrap>
+  <!-- 반짝이 셋. 자리는 눈대중입니다. -->
+  <svg class="spark a" style="left:44%;top:16px" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+    <path d="M10 1.5 12 8l6.5 2-6.5 2-2 6.5-2-6.5L1.5 10 8 8z" fill="#ffce5c" stroke="#4a3a30" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  <svg class="spark b" style="right:14%;top:52px" width="26" height="26" viewBox="0 0 20 20" aria-hidden="true">
+    <path d="M10 1.5 12 8l6.5 2-6.5 2-2 6.5-2-6.5L1.5 10 8 8z" fill="#ff8a6b" stroke="#4a3a30" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  <svg class="spark c" style="right:6%;bottom:24px" width="16" height="16" viewBox="0 0 20 20" aria-hidden="true">
+    <path d="M10 1.5 12 8l6.5 2-6.5 2-2 6.5-2-6.5L1.5 10 8 8z" fill="#5fd3b4" stroke="#4a3a30" stroke-width="1.6" stroke-linejoin="round"/></svg>
+
+  <div class=head>
+    <!-- 마스코트 = 마법사 모자를 쓴 얼굴. 그리는 차례가 중요합니다 —
+         고깔 → 얼굴 → 챙(고깔과 얼굴이 만나는 선을 덮습니다) → 별. -->
+    <svg class=face width="96" height="96" viewBox="0 0 52 52" aria-hidden="true">
+      <path d="M26 3 38 22H14z" fill="#7c5cff" stroke="#4a3a30" stroke-width="2.4" stroke-linejoin="round"/>
+      <rect x="13.2" y="27" width="25.6" height="21.5" rx="9.5" fill="#fff"
+        stroke="#4a3a30" stroke-width="2.4"/>
+      <rect x="8" y="20.6" width="36" height="6.6" rx="3.3" fill="#b9a0ff"
+        stroke="#4a3a30" stroke-width="2.4"/>
+      <path d="M26 8.6l1.5 3.2 3.5.5-2.5 2.4.6 3.5-3.1-1.6-3.1 1.6.6-3.5-2.5-2.4 3.5-.5z"
+        fill="#ffce5c" stroke="#4a3a30" stroke-width="1.3" stroke-linejoin="round"/>
+      <g fill="#4a3a30"><circle cx="21" cy="35.6" r="2.4"/><circle cx="31" cy="35.6" r="2.4"/></g>
+      <path d="M22 41q4 3.6 8 0" fill="none" stroke="#4a3a30" stroke-width="2.2" stroke-linecap="round"/>
+      <g fill="#ff5f3a" opacity=".3">
+        <ellipse cx="17.2" cy="40" rx="2.4" ry="1.6"/><ellipse cx="34.8" cy="40" rx="2.4" ry="1.6"/>
+      </g>
+    </svg>
+    <div>
+      <h1>핏톡의 <em>마법도구</em></h1>
+      <p class=bubble>코드 몰라도 괜찮아요. 홈페이지 손보는 귀찮은 일들을 여기서 뚝딱 해치웁니다.
+        만든 걸 <b>어디에 붙여넣는지</b>가 도구마다 적혀 있어요!</p>
+    </div>
+  </div>
+</div></div>
+
+<div class=wrap style="padding-top:32px">
+  <div class=sec><b>편의 도구</b><em>두루두루 쓰는 것들</em></div>
+  <div class=panel style="--c:var(--lilac)">
+    <div class=hd>
+      <h2>보고폼 변환기</h2>
+      <p>카톡으로 받은 이메일·대표번호·핸드폰을 그대로 붙여넣으면 보고용 안내문으로 바꿔 줍니다.</p>
+    </div>
+    <div class="bd stack">
+      <!-- 주소가 먼저입니다. 이걸 넣어야 현장명이 저절로 채워지니까요. -->
+      <div class=two>
+        <div>
+          <p class=lg>사이트 주소</p>
+          <input type=text id=rfSite class=mono spellcheck=false
+            placeholder="https://bsjanganjhs-0515197649.qshop.ai/">
+        </div>
+        <div>
+          <p class=lg>현장명 <span class=cnt id=rfNameState></span></p>
+          <input type=text id=rfName spellcheck=false placeholder="주소를 넣으면 자동으로 채워져요">
+        </div>
+      </div>
+      <div>
+        <p class=lg>받은 문자 <span class=cnt id=rfCnt></span></p>
+        <textarea id=rfText rows=5 spellcheck=false placeholder="0515197649&#10;kbk-4739@naver.com&#10;010 5567 7585&#10;&#10;순서가 뒤죽박죽이어도, 카톡 머리표가 붙어 있어도 괜찮아요"></textarea>
+        <div class=bar><button id=rfDemo>예시 넣기</button><button id=rfClear>비우기</button></div>
+      </div>
+      <div>
+        <p class=lg>읽어낸 것</p>
+        <div class=fields>
+          <label><input type=text id=rfId class=mono spellcheck=false placeholder="이메일">
+            <span class=hint>아이디로 들어가요</span></label>
+          <label><input type=text id=rfPw class=mono spellcheck=false placeholder="대표번호 숫자">
+            <span class=hint>비밀번호로 들어가요</span></label>
+          <label><input type=text id=rfHp class=mono readonly placeholder="핸드폰">
+            <span class=hint>확인용 · 폼엔 안 들어가요</span></label>
+        </div>
+        <div id=rfNote></div>
+      </div>
+      <div>
+        <p class=lg>보낼 안내문 <span class=cnt id=rfState></span></p>
+        <div class=modes>
+          <button class=on data-m=ceo>대표님</button>
+          <button data-m=mgr>부장님 <span>어드민 O</span></button>
+          <button data-m=mgrShort>부장님 <span>어드민 X</span></button>
+        </div>
+        <textarea id=rfOut class=mono readonly spellcheck=false></textarea>
+        <div class=bar><button class=go2 id=rfCopy>전체 복사</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class=sec><b>잇집</b><em>잇집 홈페이지에만 쓰는 것들</em></div>
+  <div class=cards>
+    <a class=card href="banner-maker.html" style="--c:var(--coral)">
+      <div class=cap><span class=no>01</span><span class=nm>배너</span><i>→</i></div>
+      <div class=body>
+        <h2>슬라이드 배너 메이커</h2>
+        <p>메인홈 맨 위, 옆으로 펼쳐지는 그 배너예요. 현장명·문구·사진·평면을 바꿉니다.</p>
+        <span class=to>붙여넣는 곳 <em class=mono>banner.json</em></span>
+      </div>
+    </a>
+
+    <a class=card href="slide-maker.html" style="--c:var(--mint)">
+      <div class=cap><span class=no>02</span><span class=nm>평면</span><i>→</i></div>
+      <div class=body>
+        <h2>에디터 내 슬라이드 메이커</h2>
+        <p>상세설명의 타입(평면도) 이미지를 좌우로 넘기는 슬라이더로 만들어요. 탭 이름·색·배치를 정합니다.</p>
+        <span class=to>붙여넣는 곳 <em>상품 상세설명</em></span>
+      </div>
+    </a>
+  </div>
+
+  <div class=panel>
+    <div class=hd>
+      <h2>유튜브 주소 변환기</h2>
+      <p>숏츠 주소는 상세설명 에디터가 못 알아봐요. 복사한 주소를 넣으면 들어가는 형식으로 바꿔 줍니다.</p>
+    </div>
+    <div class=bd>
+      <div class=grid2>
+        <div>
+          <p class=lg>복사한 유튜브 주소</p>
+          <textarea id=in rows=5 spellcheck=false placeholder="https://www.youtube.com/shorts/KynR5OiRHwY&#10;https://youtu.be/gPtF3l2DlPI"></textarea>
+          <div class=bar><button id=demo>예시 넣기</button><button id=clear>비우기</button></div>
+        </div>
+        <div>
+          <p class=lg>바뀐 주소 <span class=cnt id=cnt></span></p>
+          <div class=res id=list></div>
+          <div id=notes></div>
+          <div class=bar id=allbar style="display:none"><button class=go2 id=all>전체 복사</button></div>
+        </div>
+      </div>
+      <p class=why>
+        <b>넣는 법</b> — 상세설명 툴바의 <b>▶(동영상)</b> 버튼 → <b>미디어 URL</b> 칸에 바뀐 주소 하나를 붙여넣고 삽입.
+        두 개 이상이면 엔터 치고 바로 이어서 하나 더 넣으면 돼요.<br>
+        <b>가로·세로는 신경 안 써도 돼요</b> — 숏츠인지 일반 영상인지 코드가 알아서 봅니다.
+        숏츠 두 개는 PC에서 나란히, 모바일에서는 한 줄에 하나씩 자동으로 놓여요.<br>
+        <b>왜 바꿔야 하나</b> — 에디터가 <code>/shorts/</code> 주소를 못 알아봅니다.
+        영상 ID 11글자는 그대로고 앞부분만 달라져요.
+      </p>
+    </div>
+  </div>
+
+  <div class=foot>
+    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.0</span><s></s>만든 사람 김종민</span>
+    <p class=sub>2026-08-26 · <code>fittalk-qs/itzip</code></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var IN = $('in'), LIST = $('list'), CNT = $('cnt'), NOTES = $('notes'), ALLBAR = $('allbar');
+
+  // 영상 ID 11글자만 뽑습니다. 앞에 오는 표식으로 어느 형식인지 가립니다.
+  //   youtu.be/ID   /shorts/ID   /embed/ID   /live/ID   ?v=ID   &v=ID
+  // 공통푸터 itzip-5-media.js 의 vid() 와 같은 규칙에 /live/ 만 더했습니다. 거기가 실제로
+  // 상세설명을 읽는 쪽이라, 여기서 통과시킨 주소는 거기서도 반드시 통과해야 합니다.
+  var RE = /(?:youtu\.be\/|\/shorts\/|\/embed\/|\/live\/|[?&]v=)([\w-]{11})/g;
+
+  function scan(text) {
+    var ids = [], seen = {}, dup = 0, bad = [], m;
+    RE.lastIndex = 0;
+    while ((m = RE.exec(text))) {
+      if (seen[m[1]]) dup++; else { seen[m[1]] = 1; ids.push(m[1]); }
+    }
+    // 못 알아본 줄 찾기: 글자가 있는데 그 줄에서 아무 ID 도 안 나온 경우입니다.
+    // 주소 대신 ID 11글자만 덜렁 붙여넣는 사람도 있어서 그것은 받아 줍니다.
+    text.split(/\r?\n/).forEach(function (ln) {
+      ln = ln.trim();
+      if (!ln) return;
+      RE.lastIndex = 0;
+      if (RE.test(ln)) return;
+      if (/^[\w-]{11}$/.test(ln)) {
+        if (seen[ln]) dup++; else { seen[ln] = 1; ids.push(ln); }
+        return;
+      }
+      bad.push(ln);
+    });
+    return { ids: ids, dup: dup, bad: bad };
+  }
+
+  function url(id) { return 'https://www.youtube.com/watch?v=' + id; }
+  function esc(s) { return s.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  // 복사. 깃허브 Pages 는 https 라 clipboard API 가 되지만, 파일로 직접 열어 쓰는 경우도
+  // 있어서 옛 방식으로 물러섭니다.
+  function copy(text, btn, msg) {
+    function ok() {
+      var old = btn.textContent;
+      btn.textContent = msg || '복사됨'; btn.classList.add('done');
+      setTimeout(function () { btn.textContent = old; btn.classList.remove('done'); }, 1200);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, function () { legacy(text, ok); });
+    } else legacy(text, ok);
+  }
+  function legacy(text, done) {
+    var t = document.createElement('textarea');
+    t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); done(); } catch (e) { alert('복사가 안 됩니다. 직접 긁어서 복사해 주세요.'); }
+    document.body.removeChild(t);
+  }
+
+  function draw() {
+    var r = scan(IN.value);
+    LIST.innerHTML = ''; NOTES.innerHTML = '';
+    CNT.textContent = r.ids.length ? r.ids.length + '개' : '';
+    ALLBAR.style.display = r.ids.length ? '' : 'none';
+
+    if (!r.ids.length) {
+      LIST.innerHTML = '<p class=empty>왼쪽에 주소를 붙여넣으면<br>여기에 바뀐 주소가 나와요.</p>';
+    } else {
+      r.ids.forEach(function (id, i) {
+        var row = document.createElement('div'), u = url(id);
+        row.className = 'row';
+        // mqdefault 는 어느 영상에나 있습니다. 안 뜨면 ID 가 잘못된 것이라 눈으로 바로 걸러집니다.
+        row.innerHTML = '<span class=n>' + (i + 1) + '</span>' +
+          '<img src="https://i.ytimg.com/vi/' + id + '/mqdefault.jpg" alt="">' +
+          '<span class=u></span>';
+        row.querySelector('.u').textContent = u;
+        var b = document.createElement('button');
+        b.textContent = '복사';
+        b.onclick = function () { copy(u, b); };
+        row.appendChild(b);
+        LIST.appendChild(row);
+      });
+    }
+
+    if (r.bad.length) {
+      var d = document.createElement('div');
+      d.className = 'bad';
+      d.innerHTML = '<b>이 줄에서는 영상 주소를 못 찾았어요 (' + r.bad.length + '줄)</b>' +
+        r.bad.slice(0, 3).map(function (s) { return '<code>' + esc(s.slice(0, 60)) + '</code>'; }).join('<br>') +
+        (r.bad.length > 3 ? '<br>…' : '');
+      NOTES.appendChild(d);
+    }
+    if (r.dup) {
+      var p = document.createElement('p');
+      p.className = 'dup';
+      p.textContent = '같은 영상이 ' + r.dup + '번 더 있어서 한 번만 남겼어요.';
+      NOTES.appendChild(p);
+    }
+  }
+
+  IN.addEventListener('input', draw);
+  $('clear').onclick = function () { IN.value = ''; draw(); IN.focus(); };
+  $('demo').onclick = function () {
+    IN.value = 'https://www.youtube.com/shorts/KynR5OiRHwY\nhttps://youtu.be/gPtF3l2DlPI';
+    draw();
+  };
+  $('all').onclick = function () { copy(scan(IN.value).ids.map(url).join('\n'), this, '전체 복사됨'); };
+  draw();
+
+  /* ═══ 보고폼 변환기 ══════════════════════════════════════════════════
+     카톡으로 받은 글에서 이메일·대표번호·핸드폰을 뽑아 안내문을 만듭니다.
+     받는 모양이 사람마다 제각각이라(라벨이 있기도 없기도, 구분자가 - ~ ) 공백 아무거나)
+     "이메일 :" 같은 라벨은 믿지 않고 번호 생김새로만 가립니다.
+
+     아이디  = 이메일
+     비밀번호 = 대표번호에서 숫자만 (1533-8409 -> 15338409)
+     그 숫자는 사이트 주소에도 박혀 있어서(tsgwanjeo-15338409) 둘을 대조합니다. */
+  var NAME = $('rfName'), SITE = $('rfSite'), TXT = $('rfText'),
+      RID = $('rfId'), RPW = $('rfPw'), RHP = $('rfHp'),
+      ROUT = $('rfOut'), RNOTE = $('rfNote'), RCNT = $('rfCnt'), RSTATE = $('rfState'),
+      MODES = $('rfOut').parentNode.querySelector('.modes');
+
+  var TAIL = '※ 로그인 후 [콘텐츠 > 입력폼 관리 > 방문예약] 메뉴를 순서대로 클릭하시면, ' +
+    '광고를 통해 문의주신 고객 정보를 한 번에 편리하게 관리하실 수 있습니다.';
+
+  // 보내는 곳에 따라 세 벌. 다른 것은 인사말(호칭)과 어드민 안내를 붙이느냐뿐이라
+  // 본문을 세 번 쓰지 않고 이 표만 갈아 끼웁니다.
+  var MODE = {
+    ceo:      { who: '대표님', admin: true },
+    mgr:      { who: '부장님', admin: true },
+    mgrShort: { who: '부장님', admin: false }
+  };
+  var mode = 'ceo';
+
+  var SEP = '[-.\\s~)）]';                       // 1533-8409 / 051)519~7649 / 010 5567 7585
+  var RE_MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
+  var RE_HP = new RegExp('01[016789]' + SEP + '?\\d{3,4}' + SEP + '?\\d{4}');
+  var RE_REP = new RegExp('1[5678]\\d{2}' + SEP + '?\\d{4}' +      // 전국대표번호 15xx 16xx 18xx
+    '|0(?:2|70|[3-6][1-5])' + SEP + '{0,2}\\d{3,4}' + SEP + '?\\d{4}');  // 지역번호 / 070
+
+  function dig(s) { return String(s || '').replace(/\D/g, ''); }
+
+  function readReq(raw) {
+    // 카톡에서 그대로 긁으면 [아름다운 인생] [오후 2:46] 머리표가 붙습니다. 시간의 숫자가
+    // 전화번호로 잡히지 않게 먼저 지웁니다.
+    var t = String(raw || '').replace(/\[[^\]\n]*\]/g, ' ');
+    var m = t.match(RE_MAIL), email = m ? m[0] : '';
+    // 찾은 것은 지워 가며 봅니다. rkd1031402@naver.com 처럼 이메일 안에 든 숫자가
+    // 전화번호로 잡히는 것을 막습니다.
+    if (email) t = t.split(email).join(' ');
+    m = t.match(RE_HP); var hp = m ? m[0] : '';
+    if (hp) t = t.split(hp).join(' ');
+    m = t.match(RE_REP); var rep = m ? m[0] : '';
+    return { email: email, hp: hp, rep: rep };
+  }
+
+  // 주소는 https:// 가 붙어 있든 없든, 뒤에 /admin 이 딸려 있든 받아서 앞부분만 씁니다.
+  function siteBase(s) {
+    s = String(s || '').trim().replace(/^https?:\/\//i, '').replace(/\s+/g, '');
+    s = s.split('/')[0].replace(/\.+$/, '');
+    if (!s) return '';
+    if (s.indexOf('.') === -1) s += '.qshop.ai';   // tsgwanjeo-15338409 만 넣었을 때
+    return 'https://' + s;
+  }
+  // 주소 앞라벨 끝의 숫자 덩어리 = 대표번호. tsgwanjeo-15338409 -> 15338409
+  function siteNo(base) {
+    var m = base.replace(/^https?:\/\//, '').split('.')[0].match(/(\d{7,})$/);
+    return m ? m[1] : '';
+  }
+
+  function rfRead() {
+    var r = readReq(TXT.value);
+    RID.value = r.email;
+    RHP.value = r.hp;
+    // 글에 대표번호가 없으면 주소에 박힌 숫자를 씁니다 (이메일만 보내오는 경우가 있습니다)
+    RPW.value = dig(r.rep) || siteNo(siteBase(SITE.value));
+    RCNT.textContent = TXT.value.trim()
+      ? [r.email && '이메일', r.rep && '대표번호', r.hp && '핸드폰'].filter(Boolean).join('·') || '못 읽었어요'
+      : '';
+    rfBuild();
+  }
+
+  function rfBuild() {
+    var b = siteBase(SITE.value), nm = NAME.value.trim(),
+        id = RID.value.trim(), pw = RPW.value.trim(), notes = [];
+    var m = MODE[mode];
+    // 어드민 없는 버전은 아이디·비밀번호가 없어도 만들 수 있습니다.
+    var ok = !!(nm && b) && (!m.admin || !!(id && pw));
+
+    ROUT.value = !ok ? '' :
+      m.who + ', ' + nm + ' 홈페이지 보고드립니다.\n\n' +
+      '홈페이지 : ' + b + '/' +
+      (m.admin
+        ? '\n관리자페이지 : ' + b + '/admin' +
+          '\n입력폼관리페이지 : ' + b + '/admin/contents/form' +
+          '\n아이디 : ' + id +
+          '\n비밀번호 : ' + pw +
+          '\n방문예약 확인 : ' + b + '/contact\n\n' + TAIL
+        : '');
+    // 긴 ※ 줄이 두세 줄로 접히므로 여유를 더 줍니다
+    ROUT.rows = Math.max(4, ROUT.value.split('\n').length + 3);
+
+    // 가장 중요한 확인 — 주소에 박힌 번호와 비밀번호가 같은가.
+    // 다르면 다른 현장 것을 섞어 붙인 것입니다. 어드민 없는 버전에도 주소는 들어가므로
+    // 비밀번호를 안 쓰더라도 이 대조는 그대로 합니다.
+    var sn = siteNo(b), clash = !!(sn && pw && sn !== pw);
+    if (clash) {
+      notes.push('<b>주소의 번호와 비밀번호가 달라요</b>주소는 <code>' + esc(sn) +
+        '</code>, 비밀번호는 <code>' + esc(pw) + '</code> 예요. 다른 현장 것이 섞이지 않았는지 봐 주세요.');
+    }
+    if (!nm) notes.push('<b>현장명을 넣어 주세요</b>인사말에 들어갑니다. 보기: 부산 장안지구 중흥S-클래스');
+    else if (!b) notes.push('<b>사이트 주소를 넣어 주세요</b>');
+    else if (m.admin && !id) notes.push('<b>이메일을 못 찾았어요</b>받은 문자를 다시 보거나 위 칸에 직접 적어 주세요.');
+    else if (m.admin && !pw) notes.push('<b>대표번호를 못 찾았어요</b>받은 문자를 다시 보거나 위 칸에 직접 적어 주세요.');
+
+    RNOTE.innerHTML = notes.length
+      ? '<div class=warn>' + notes.join('</div><div class=warn>') + '</div>' : '';
+    RSTATE.textContent = (ok && !clash) ? '준비됐어요' : '';
+  }
+
+  MODES.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (!b || !b.hasAttribute('data-m')) return;
+    [].forEach.call(this.querySelectorAll('button'), function (x) { x.classList.toggle('on', x === b); });
+    mode = b.getAttribute('data-m');
+    rfBuild();
+  });
+  /* ── 현장명 자동으로 읽기 ────────────────────────────────────────────
+     큐샵 사이트의 <title> 이 곧 현장명입니다 (부산 장안지구 중흥S-클래스).
+     다만 큐샵은 CORS 헤더를 안 줘서 브라우저가 그 페이지를 직접 못 읽습니다
+     (fetch 하면 그냥 "Failed to fetch"). 그래서 중계소를 한 번 거칩니다. 하나가
+     막히면 다른 하나로 더 해 보고, 둘 다 안 되면 조용히 손입력으로 물러섭니다.
+     넘어가는 것은 공개된 분양 홈페이지 주소뿐입니다. */
+  var VIA = [
+    function (u) { return 'https://corsproxy.io/?url=' + encodeURIComponent(u); },
+    function (u) { return 'https://r.jina.ai/' + u; }
+  ];
+  var titleCache = {}, nameManual = false, nameTimer = null, nameSeq = 0;
+  var RNAME = $('rfNameState');
+
+  function readTitle(url) {
+    function step(i) {
+      if (i >= VIA.length) return Promise.reject(new Error('막힘'));
+      return fetch(VIA[i](url)).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      }).then(function (t) {
+        var m = t.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        // r.jina.ai 는 HTML 이 아니라 "Title: 이름" 으로 된 글을 줍니다
+        var s = m ? m[1] : (t.match(/^Title:\s*(.+)$/m) || [])[1];
+        s = String(s || '').replace(/\s+/g, ' ').trim();
+        if (!s) throw new Error('제목 없음');
+        return s;
+      }).catch(function () { return step(i + 1); });
+    }
+    return step(0);
+  }
+
+  function autoName() {
+    var b = siteBase(SITE.value);
+    if (!b) { RNAME.textContent = ''; return; }
+    if (titleCache[b] !== undefined) { putName(titleCache[b]); return; }
+    var my = ++nameSeq;                       // 그 사이 주소가 또 바뀌면 옛 답은 버립니다
+    RNAME.textContent = '읽는 중…';
+    readTitle(b + '/').then(function (s) {
+      if (my !== nameSeq) return;
+      titleCache[b] = s; putName(s);
+    }).catch(function () {
+      if (my !== nameSeq) return;
+      titleCache[b] = '';
+      RNAME.textContent = '못 읽었어요 · 직접 넣어 주세요';
+    });
+  }
+  function putName(s) {
+    if (!s) { RNAME.textContent = '못 읽었어요 · 직접 넣어 주세요'; return; }
+    RNAME.textContent = '자동으로 읽었어요';
+    if (nameManual) return;                   // 손으로 고친 뒤에는 덮어쓰지 않습니다
+    NAME.value = s;
+    rfBuild();
+  }
+
+  NAME.addEventListener('input', function () { nameManual = true; rfBuild(); });
+
+  TXT.addEventListener('input', rfRead);
+  SITE.addEventListener('input', function () {
+    // 글에서 대표번호를 못 찾은 상태면 주소가 바뀔 때마다 거기서 다시 가져옵니다
+    if (!dig(readReq(TXT.value).rep)) RPW.value = siteNo(siteBase(SITE.value));
+    rfBuild();
+    // 주소가 바뀌면 현장명도 새로 읽습니다. 글자 칠 때마다 부르지 않게 조금 기다립니다.
+    nameManual = false;
+    clearTimeout(nameTimer);
+    nameTimer = setTimeout(autoName, 700);
+  });
+  RID.addEventListener('input', rfBuild);
+  RPW.addEventListener('input', rfBuild);
+  $('rfDemo').onclick = function () {
+    SITE.value = 'https://bsjanganjhs-0515197649.qshop.ai/';
+    TXT.value = '이메일: kbk-4739@naver.com\n051)519~7649\n010 5567 7585';
+    NAME.value = '';                      // 자동으로 채워지는 것을 보여 주려고 비워 둡니다
+    nameManual = false;
+    rfRead();
+    autoName();
+  };
+  $('rfClear').onclick = function () {
+    NAME.value = ''; SITE.value = ''; TXT.value = '';
+    nameManual = false; RNAME.textContent = '';
+    rfRead(); SITE.focus();
+  };
+  $('rfCopy').onclick = function () {
+    if (!ROUT.value) return;
+    copy(ROUT.value, this, '복사했어요');
+  };
+  rfBuild();
+})();
+</script>

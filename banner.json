@@ -1,0 +1,64 @@
+{
+  "site": "북오산 자이 드포레",
+  "link": "https://www.itzip.net/products/766260",
+  "cta": "더 보기",
+  "duration": 5000,
+  "panels": [
+    {
+      "label": "핵심 포인트",
+      "title": "25평 4억대!\n34평 6억대!",
+      "sub": "GS건설이 만드는 1,517세대 신규 대단지!\n5천세대 미니신도시 내 2번째 단지!",
+      "bg": "https://cdn.qshop.ai/94548/gallery/0f22c0d08cae11f1a4bdfb5e53885e26.png",
+      "chips": [
+        "계약금 10%(1차 계약금 1천만원)",
+        "AI반도체 부동산 비규제지역 최대수혜단지"
+      ]
+    },
+    {
+      "label": "인테리어",
+      "title": "인테리어",
+      "bg": "https://cdn.qshop.ai/94548/gallery/64b18d608ef711f1b0df5318c87434e1.png",
+      "feats": [
+        {
+          "icon": "sofa",
+          "text": "라이프스타일을 존중하기에\n당신만을 위한 특별한 설계를 제안합니다."
+        }
+      ]
+    },
+    {
+      "label": "프리미엄",
+      "title": "프리미엄",
+      "bg": "https://cdn.qshop.ai/94548/gallery/160880108cae11f1982569f1873a2ffd.png",
+      "feats": [
+        { "icon": "train", "text": "북오산 IC 이용\n사통팔달 교통" },
+        { "icon": "book", "text": "지구 내 초등학교(계획)\n안전한 도보통학" }
+      ],
+      "chips": ["총 1,517세대", "동탄·세교 생활인프라", "필봉산 자연환경"]
+    },
+    {
+      "label": "평면",
+      "title": "평면",
+      "bg": "https://cdn.qshop.ai/94548/gallery/18744ff08cae11f1b69489cbdc94b424.png",
+      "plans": [
+        {
+          "name": "59m²B",
+          "desc": "",
+          "img": "https://cdn.qshop.ai/94548/gallery/4eee1c508ef711f1982569f1873a2ffd.png",
+          "thumb": "https://cdn.qshop.ai/94548/gallery/58b354d08ef711f1a4bdfb5e53885e26.png"
+        },
+        {
+          "name": "84m²B",
+          "desc": "",
+          "img": "https://cdn.qshop.ai/94548/gallery/51e367808ef711f1982569f1873a2ffd.png",
+          "thumb": "https://cdn.qshop.ai/94548/gallery/5b7d71508ef711f1a4bdfb5e53885e26.png"
+        },
+        {
+          "name": "99m²B",
+          "desc": "",
+          "img": "https://cdn.qshop.ai/94548/gallery/553d67f08ef711f1982569f1873a2ffd.png",
+          "thumb": "https://cdn.qshop.ai/94548/gallery/5e5cea908ef711f1982569f1873a2ffd.png"
+        }
+      ]
+    }
+  ]
+}
