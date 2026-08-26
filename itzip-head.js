@@ -106,7 +106,6 @@
 // wcs_add 와 _nasa 는 스크립트를 붙이기 전에 먼저 채웁니다. 원본보다 이른 시점인데,
 // 이르면 이를수록 안전하고(wcslog 가 로드 중에 읽더라도 이미 있음) 콘솔 점검을
 // 네트워크가 느린 날에도 통과합니다.
-/* ===== itzip-head-4-naver.js ===== */
 (function () {
   window.wcs_add = window.wcs_add || {};
   window.wcs_add['wa'] = 's_4d7836409a97';
@@ -127,24 +126,129 @@
 })();
 
 /* ===== itzip-head-5-conversion.js ===== */
-// 네이버 전환 발사. 두 가지를 잡습니다.
-//   방문예약 완료  -> cnv "2"   (fitSendReservation 가로채기)
-//   전화연결 클릭  -> cnv "5"   (tel: 링크와 상담 버튼 mousedown)
+// 네이버 전환 발사. 세 가지를 잡습니다.
+//   현장 상세 유입  -> view_content   (들어올 때마다 한 번, SPA 이동 포함)
+//   방문예약 완료   -> schedule       (fitSendReservation 가로채기)
+//   전화연결 클릭   -> 기타 전환 5    (tel: 링크와 상담 버튼 mousedown)
 //
 // iframe 안에서는 통째로 건너뜁니다. 배너나 코드위젯 안에서 한 번 더 세면
 // 전환이 부풀기 때문입니다. 원본 Body 코드도 이 세 블록에만 같은 가드를 두었습니다.
 // (GA4 와 wcslog 로더에는 가드가 없었고, 그 동작을 그대로 옮겼습니다.)
 //
-// NA_SEND 를 가로채기보다 먼저 정의합니다. 원본은 순서가 반대였는데, 어느 쪽이든
-// 실제로 부르는 시점은 클릭 이후라 결과는 같습니다.
+// 2026-08-26 네이버 검수 지적 두 가지를 여기서 고칩니다.
+//
+//  1) 방문예약 완료에서 NA_SEND 가 2번 실행됨.
+//     큐샵은 SPA 라 페이지를 옮길 때마다 공통 Header 코드를 다시 실행합니다.
+//     (목록에서 현장 상세로 들어가면 이 파일이 두 번째로 돕니다. 눈에 보이는
+//      script 태그 수는 그대로라 놓치기 쉽습니다. wcslog 태그가 이동할 때마다
+//      하나씩 늘어나는 것으로 확인했습니다.)
+//     그때 아래 defineProperty 가 이미 씌워 둔 wrapper 를 다시 감싸서, 예약 한 번에
+//     NA_SEND 가 두 번 불렸습니다. 그래서 설치는 창당 한 번만 하도록 막았습니다.
+//     밑에 발사 시점 중복 차단(SENT_GAP)도 하나 더 두었습니다.
+//
+//  2) 예약 완료 전환이 옛날 방식(wcs.cnv 2 + wcs_do)이라 검수 불합격.
+//     네이버가 준 형태인 wcs.trans 로 바꿉니다. 전화연결은 검수 대상이 아니고
+//     지금 잘 잡히고 있어서 옛 방식 그대로 둡니다.
 (function () {
   if (window.top !== window.self) return;
 
+  // 창당 한 번만 설치합니다. 큐샵이 페이지를 옮기며 이 파일을 다시 실행해도
+  // 여기서 돌아섭니다. 앞 조각(itzip-head-1-webhook.js)이 다시 대입하는
+  // window.fitSendReservation 은 아래 setter 가 받아 두므로 예약 웹훅은 계속 살아 있습니다.
+  if (window.FIT_NAVER_CONV) return;
+  window.FIT_NAVER_CONV = 1;
+
+  var WA = 's_4d7836409a97';
+  var DETAIL = '/products/';   // 현장 상세 페이지 경로
+  var SENT_GAP = 5000;         // 같은 전환을 이 시간 안에 두 번 쏘지 않습니다
+
+  // 큐샵도 자기 wcslog 를 따로 붙입니다. 그쪽이 wcs_add 를 건드려도 우리 계정으로
+  // 나가도록, 쏘기 직전에 매번 다시 채웁니다.
+  function acct() {
+    window.wcs_add = window.wcs_add || {};
+    window.wcs_add['wa'] = WA;
+  }
+
+  var sent = {};
+  function once(key) {
+    var now = Date.now();
+    if (sent[key] && now - sent[key] < SENT_GAP) return false;
+    sent[key] = now;
+    return true;
+  }
+
+  // ---- 콘텐츠 보기(view_content) -----------------------------------------
+  // 현장 상세 페이지에 들어올 때 한 번. 큐샵은 SPA 라 목록에서 상세로 들어가도
+  // 문서를 새로 읽지 않으므로, 주소가 바뀌는 것을 직접 봐야 합니다.
+  //
+  // wcslog 는 바로 옆 조각이 async 로 붙이므로 이 코드가 돌 때는 아직 없을 수 있습니다.
+  // 올 때까지 0.3초 간격으로 최대 12초 기다립니다.
+  var curPath = location.pathname;
+  var vcDone = false;
+  var vcTimer = 0, vcLeft = 0;
+
+  function vcTry() {
+    if (curPath.indexOf(DETAIL) !== 0) return true;   // 상세 페이지가 아니면 볼 일 없음
+    if (vcDone) return true;
+    if (!window.wcs || !window.wcs.trans) return false;   // 아직 wcslog 전. 다시 옵니다
+    vcDone = true;
+    try {
+      acct();
+      var _conv = {};
+      _conv.type = 'view_content';
+      window.wcs.trans(_conv);
+    } catch (e) {}
+    return true;
+  }
+
+  function vcSoon() {
+    if (vcTry()) return;
+    vcLeft = 40;
+    if (vcTimer) return;
+    vcTimer = setInterval(function () {
+      if (vcTry() || --vcLeft <= 0) { clearInterval(vcTimer); vcTimer = 0; }
+    }, 300);
+  }
+
+  // 주소가 실제로 바뀐 것만 새 유입으로 봅니다. 큐샵이 같은 주소로 replaceState 를
+  // 한 번 더 부르는 경우가 있어서, 그것까지 세면 view_content 가 겹칩니다.
+  function onNav() {
+    if (location.pathname === curPath) return;
+    curPath = location.pathname;
+    vcDone = false;
+    vcSoon();
+  }
+  function hookNav(m) {
+    var orig = history[m];
+    if (typeof orig !== 'function') return;
+    history[m] = function () {
+      var r = orig.apply(this, arguments);
+      setTimeout(onNav, 0);
+      return r;
+    };
+  }
+  hookNav('pushState');
+  hookNav('replaceState');
+  window.addEventListener('popstate', function () { setTimeout(onNav, 0); });
+  vcSoon();
+
+  // ---- 전환 발사 ----------------------------------------------------------
+  // schedule 은 네이버가 준 형태 그대로 wcs.trans 로 나갑니다.
+  // 그 밖(전화연결)은 예전부터 쓰던 wcs.cnv 기타 전환 5 를 그대로 씁니다.
   window.NA_SEND = function (type) {
     try {
       if (!window.wcs) return;
+      if (!once(type === 'schedule' ? 'schedule' : 'call')) return;
+      acct();
+      if (type === 'schedule') {
+        if (!window.wcs.trans) return;
+        var _conv = {};
+        _conv.type = 'schedule';
+        window.wcs.trans(_conv);
+        return;
+      }
       if (!window._nasa) window._nasa = {};
-      window._nasa['cnv'] = window.wcs.cnv(type === 'schedule' ? '2' : '5', '1');
+      window._nasa['cnv'] = window.wcs.cnv('5', '1');
       window.wcs_do(window._nasa);
     } catch (e) {}
   };
@@ -181,15 +285,11 @@
   }
 
   // 전화연결 클릭. 캡처 단계라 다른 코드가 클릭을 삼켜도 잡힙니다.
-  // 같은 클릭이 여러 요소를 타고 두 번 세지지 않게 3초 안에는 한 번만 셉니다.
-  var lastCall = 0;
+  // 같은 클릭이 여러 요소를 타고 두 번 세지지 않게 위의 once 가 막습니다.
   document.addEventListener('mousedown', function (e) {
     var t = e.target;
     if (!t || !t.closest) return;
     if (!t.closest('a.fit-consult, [data-fit-cta], a[href^="tel:"]')) return;
-    var now = Date.now();
-    if (now - lastCall < 3000) return;
-    lastCall = now;
     window.NA_SEND('custom001');
   }, true);
 })();
