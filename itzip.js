@@ -612,13 +612,24 @@ window.FIT_BRAND = {
 (function () {
   // Per-site values for the reservation flow.
   //
-  // Every per-site number lives in one table on the contact page:
+  // Every per-site value lives in one table on the contact page:
   //
-  //     번호 | 현장명              | 대표번호   | 휴대폰 번호
-  //     1    | 오산 헤리티지 자이   | 1111-1111 | 010-1111-1111, 010-2222-2222
+  //     번호 | 상품번호 | 현장명                  | 대표번호   | 휴대폰 번호
+  //     1    | 772203  | 북오산 자이 드포레_GFA   | 1600-6102 | 010-1111-1111, 010-2222-2222
+  //     2    | 771822  | 북오산 자이 드포레_메타  | 1600-6102 | 010-1111-1111
   //
   // That page is already loaded by the reservation modal, so one table covers every site
   // and nothing has to be planted in the product pages themselves.
+  //
+  // 상품번호 is the number in the page address - /products/772203 - and it is the lookup
+  // key. It used to be the 현장명 read off the product title, which cannot tell two rows
+  // apart when one site is sold through two pages (a GFA one and a 메타 one), and which is
+  // not drawn at all on a 미진열 product. The address always carries the number, so keying
+  // off it fixes both. Pasting the whole URL into the cell works too - only digits are read.
+  //
+  // 현장명 is what the notification text and the sheet say, so that is where the channel is
+  // spelled out: 북오산 자이 드포레_GFA. The QShop 접수 기록 gets the same name with that
+  // _접미사 trimmed off (baseName below), so the record there stays the plain site name.
   //
   // 대표번호 is the number the consult buttons dial, so only the first one there is used.
   // 휴대폰 번호 is who the notification text goes to and may name several people, comma
@@ -627,12 +638,16 @@ window.FIT_BRAND = {
   // Columns are matched by their heading, so their order can change. Without headings the
   // code falls back to reading the row left to right. Values are passed through exactly as
   // written - hyphens included, since Google Sheets would otherwise eat the leading zero.
+  //
+  // A row with no 상품번호 still matches on 현장명 exactly as before, so the table can be
+  // filled in one row at a time. tel_source in the webhook says which way it matched:
+  // id, name, or none.
   var B = window.FIT_BRAND || {};
   var CONTACT = B.contactPath || '/contact';
   var FALLBACK_TEL = B.tel || '1668-1561';
-  var CACHE_KEY = 'fitSiteTels4';
+  var CACHE_KEY = 'fitSiteTels5';   // 5: rows are keyed by 상품번호, so the v4 shape is stale
 
-  var tels = null;        // site name -> { tel, manager }, once the table has been read
+  var tels = null;        // { byId:{}, byName:{} } of { id, name, tel, manager }, once read
   var loading = false;
 
   // Hyphens optional, so a row typed without them still works. Eight to eleven digits
@@ -664,15 +679,35 @@ window.FIT_BRAND = {
     return out;
   }
 
+  // The product number out of an address. Reads a bare 772203, a /products/772203 path or
+  // a pasted https://www.itzip.net/products/772203?utm=... alike - the last run of digits
+  // that follows /products/ wins, and failing that a cell that is nothing but digits.
+  function idOf(s) {
+    var t = key(s);
+    var m = /\/products\/(\d+)/.exec(t);
+    if (m) return m[1];
+    return /^\d{3,}$/.test(t) ? t : '';    // three digits up, so the 번호 column (1,2,3) is skipped
+  }
+
+  // The channel suffix the table adds to tell two pages of one site apart - the _GFA in
+  // 북오산 자이 드포레_GFA. The webhook and the text keep it; the QShop 접수 기록 does not.
+  function stripSuffix(s) {
+    var t = key(s).replace(/\s*_\s*[^_]+$/, '').trim();
+    return t || key(s);   // a name that is nothing but a suffix stays whole
+  }
+
   // Locate the columns from the heading row. Returns -1 for anything not found.
   function headings(rows) {
-    var idx = { name: -1, tel: -1, manager: -1 };
+    var idx = { id: -1, name: -1, tel: -1, manager: -1 };
     for (var r = 0; r < rows.length && r < 3; r++) {
       var cells = rows[r].querySelectorAll('td,th');
       var hit = false;
       for (var c = 0; c < cells.length; c++) {
         var h = key(cells[c].textContent);
-        if (idx.name < 0 && (h.indexOf('현장') >= 0 || h.indexOf('사이트') >= 0)) { idx.name = c; hit = true; }
+        // 상품번호 is checked first: it also ends in 번호, and the plain 번호 (row count)
+        // column matches none of these, which is what keeps the two apart.
+        if (idx.id < 0 && (h.indexOf('상품') >= 0 || h.indexOf('product') >= 0 || h.indexOf('PRODUCT') >= 0)) { idx.id = c; hit = true; }
+        else if (idx.name < 0 && (h.indexOf('현장') >= 0 || h.indexOf('사이트') >= 0)) { idx.name = c; hit = true; }
         else if (idx.tel < 0 && h.indexOf('대표') >= 0) { idx.tel = c; hit = true; }
         else if (idx.manager < 0 && (h.indexOf('휴대') >= 0 || h.indexOf('수신') >= 0 || h.indexOf('담당') >= 0)) { idx.manager = c; hit = true; }
       }
@@ -683,15 +718,19 @@ window.FIT_BRAND = {
 
   function cellAt(cells, i) { return (i >= 0 && cells[i]) ? key(cells[i].textContent) : ''; }
 
+  // Reads the table into two indexes off the same row objects: byId for the 상품번호 and
+  // byName for the 현장명. A row lands in both when it has both, so a table that has not
+  // been given product numbers yet keeps working on names alone.
   function parseDoc(doc) {
-    var map = {};
+    var map = { byId: {}, byName: {} };
     if (!doc) return map;
     var rows = doc.querySelectorAll('tr');
     var idx = headings(rows);
     for (var r = 0; r < rows.length; r++) {
       var cells = rows[r].querySelectorAll('td,th');
-      var name = '', tel = '', manager = '';
+      var id = '', name = '', tel = '', manager = '';
       if (idx.name >= 0) {
+        id = idOf(cellAt(cells, idx.id));
         name = cellAt(cells, idx.name);
         tel = phoneList(cellAt(cells, idx.tel))[0] || '';          // buttons can only dial one
         manager = phoneList(cellAt(cells, idx.manager)).join(','); // the text goes to all of them
@@ -706,12 +745,24 @@ window.FIT_BRAND = {
             if (!tel) { tel = pl[0]; if (pl.length > 1) manager = pl.slice(1).join(','); }
             else if (!manager) manager = pl.join(',');
           }
-          else if (!/^[0-9]+$/.test(t) && !name) { name = t; }   // skip the row-number column
+          else if (!id && idOf(t)) { id = idOf(t); }              // a bare 772203 or a pasted URL
+          else if (!/^[0-9]+$/.test(t) && !name) { name = t; }    // skip the row-number column
         }
       }
-      if (name && tel) map[name] = { tel: tel, manager: manager };
+      if (!name || !(tel || manager)) continue;   // a heading row or stray table, not a site
+      var rec = { id: id, name: name, tel: tel, manager: manager };
+      if (id) map.byId[id] = rec;
+      if (!map.byName[name]) map.byName[name] = rec;   // first row wins, as it always did
     }
     return map;
+  }
+
+  // Non-empty in the sense that matters - at least one row landed in one of the indexes.
+  function hasRows(map) {
+    if (!map) return false;
+    for (var a in (map.byId || {})) return true;
+    for (var b in (map.byName || {})) return true;
+    return false;
   }
 
   // The contact page is a single page app, so what the server returns is an empty shell -
@@ -723,7 +774,7 @@ window.FIT_BRAND = {
     // The common code runs on the contact page too, so opening that page in a frame from
     // there would load another copy of the common code, which would open another frame,
     // without end. Only a top level product page needs the table; everything else stops.
-    if (window.top !== window.self || location.pathname.indexOf(CONTACT) === 0) { tels = {}; return; }
+    if (window.top !== window.self || location.pathname.indexOf(CONTACT) === 0) { tels = { byId: {}, byName: {} }; return; }
     loading = true;
     // The cache is a head start, not the answer. It fills the buttons immediately, and the
     // read below still runs and overwrites it. Without that, editing the table would have
@@ -732,7 +783,7 @@ window.FIT_BRAND = {
       var cached = sessionStorage.getItem(CACHE_KEY);
       if (cached) {
         var m = JSON.parse(cached);
-        for (var k in m) { tels = m; break; }   // only trust a non-empty cache
+        if (hasRows(m)) tels = m;               // only trust a non-empty cache
       }
     } catch (e) {}
 
@@ -742,13 +793,11 @@ window.FIT_BRAND = {
     frame.src = CONTACT;
     var tries = 0;
     function finish(map) {
-      var got = false;
-      for (var k in map) { got = true; break; }
-      if (got) {
+      if (hasRows(map)) {
         tels = map;                                   // fresh read wins over the cache
         try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(map)); } catch (e) {}
       } else if (!tels) {
-        tels = {};                                    // nothing read and nothing cached
+        tels = { byId: {}, byName: {} };              // nothing read and nothing cached
       }                                               // an empty read never overwrites a cache
       loading = false;
       if (frame.parentNode) frame.parentNode.removeChild(frame);
@@ -758,25 +807,36 @@ window.FIT_BRAND = {
       try { doc = frame.contentDocument; } catch (e) {}
       if (doc && doc.body) {
         var map = parseDoc(doc);
-        for (var k in map) { finish(map); return; }   // rows have been drawn
+        if (hasRows(map)) { finish(map); return; }    // rows have been drawn
       }
-      if (++tries > 60) { finish({}); return; }       // about 12 seconds, then give up
+      if (++tries > 60) { finish(null); return; }     // about 12 seconds, then give up
       setTimeout(peek, 200);
     }
     (document.body || document.documentElement).appendChild(frame);
     setTimeout(peek, 200);
   }
 
-  function siteName() {
+  // The product title. Only a fallback now - it is blank on a 미진열 product and identical
+  // on two pages of one site, which is exactly what the 상품번호 key was added to get past.
+  function titleName() {
     var h = document.querySelector('.productDetailPage h1');
     return h ? key(h.textContent) : '';
   }
 
-  function row() {
+  // The 상품번호 of the page being looked at, straight out of the address.
+  function pageId() { return idOf(location.pathname); }
+
+  // 상품번호 first, product title second. Returns the row and how it was found, because
+  // the 접미사 only means anything when the row came from the table.
+  function lookup() {
     if (!tels) { load(); return null; }
-    var n = siteName();
-    return (n && tels[n]) ? tels[n] : null;
+    var id = pageId();
+    if (id && tels.byId[id]) return { rec: tels.byId[id], how: 'id' };
+    var n = titleName();
+    if (n && tels.byName[n]) return { rec: tels.byName[n], how: 'name' };
+    return null;
   }
+  function row() { var x = lookup(); return x ? x.rec : null; }
 
   load();
 
@@ -792,13 +852,22 @@ window.FIT_BRAND = {
     // The same list as an array, for anything that wants to walk the recipients.
     managerPhones: function () { var s = this.managerPhone(); return s ? s.split(',') : []; },
 
-    // Whether the row was found. Lands in the 추출 경로 column, so a site that is
-    // missing from the table can be spotted at a glance.
-    telSource: function () { return row() ? 'table' : 'none'; },
+    // How the row was found. Lands in the 추출 경로 column, so a page whose 상품번호 is
+    // still missing from the table reads as name (or none) at a glance instead of id.
+    telSource: function () { var x = lookup(); return x ? x.how : 'none'; },
 
-    // Site name, taken from the product title. This is the sheet lookup key and also
-    // the key into the table above, so the two have to agree.
-    name: siteName,
+    // Site name for the notification text and the sheet, so it carries the _GFA / _메타
+    // 접미사 the table spells out. Falls back to the product title only when the page is
+    // not in the table yet, and that title is itself blank on a 미진열 product.
+    name: function () { var x = row(); return (x && x.name) || titleName(); },
+
+    // The same name with the channel 접미사 trimmed off, for anywhere the plain site name
+    // is wanted - the QShop 접수 기록 field is the one caller today.
+    baseName: function () { var x = row(); return x ? stripSuffix(x.name) : titleName(); },
+
+    // The 상품번호 out of the address. Rides along in the webhook so the sheet and the Zap
+    // can group on something that never changes, whatever the name is typed as.
+    productId: pageId,
 
     // Full URL including the query string, so ad tracking params survive.
     url: function () { return location.href; }
@@ -1735,7 +1804,10 @@ window.fitReserve = function (mount) {
       }
       if (f.date) setReactValue(f.date, date);
       if (f.time) setReactValue(f.time, time);
-      if (f.site) setReactValue(f.site, currentSite());
+      // 큐샵 접수 기록에는 채널 접미사 없는 맨 현장명이 들어갑니다. 표를 못 찾았을 때만
+      // 상품 제목으로 물러섭니다 (미진열이면 그마저 비어 있습니다).
+      var SS = window.FIT_SITE || {};
+      if (f.site) setReactValue(f.site, (SS.baseName ? SS.baseName() : '') || currentSite());
       if (f.agree && !f.agree.checked) f.agree.click();
 
       await wait(500);
@@ -1767,11 +1839,13 @@ window.fitReserve = function (mount) {
           phone_raw:  phone,
           date:       date,
           time:       time,
-          site:       (S.name ? S.name() : currentSite()),   // 시트 조회 키
+          site:       (S.name ? S.name() : '') || currentSite(),      // 문자·시트에 찍히는 이름, _GFA 까지
+          site_base:     (S.baseName ? S.baseName() : ''),           // 접미사 뗀 맨 현장명
+          site_id:       (S.productId ? S.productId() : ''),         // 상품번호, /products/뒤 숫자
           site_phone:    (S.tel ? S.tel() : ''),                     // 대표번호
           manager_phone: (S.managerPhone ? S.managerPhone() : ''),   // 휴대폰 번호, 문자는 여기로
           page_url:      (S.url ? S.url() : location.href),          // 광고 파라미터까지 붙은 전체 주소
-          tel_source:    (S.telSource ? S.telSource() : '')          // table 또는 none
+          tel_source:    (S.telSource ? S.telSource() : '')          // id / name / none
         }); } catch(e){}
         alert('방문예약이 정상적으로 접수되었습니다.\n빠른 시일 내 연락드리겠습니다.');
         btn.disabled = false; btn.textContent = labelText;   // 다음에 열었을 때 눌리도록

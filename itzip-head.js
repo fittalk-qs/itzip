@@ -31,6 +31,8 @@
                + '&date='       + encodeURIComponent(p.date || '')
                + '&time='       + encodeURIComponent(p.time || '')
                + '&site='       + encodeURIComponent(p.site || '')
+               + '&site_base='  + encodeURIComponent(p.site_base || p.site || '')
+               + '&site_id='    + encodeURIComponent(p.site_id || '')
                + '&site_phone=' + encodeURIComponent(p.site_phone || '')
                + '&manager_phone=' + encodeURIComponent(list.join(','))
                + '&manager_phone_raw=' + encodeURIComponent(list.map(digits).join(','))
