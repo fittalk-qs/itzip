@@ -1804,10 +1804,13 @@ window.fitReserve = function (mount) {
       }
       if (f.date) setReactValue(f.date, date);
       if (f.time) setReactValue(f.time, time);
-      // 큐샵 접수 기록에는 채널 접미사 없는 맨 현장명이 들어갑니다. 표를 못 찾았을 때만
-      // 상품 제목으로 물러섭니다 (미진열이면 그마저 비어 있습니다).
+      // 큐샵 접수 기록에도 표에 쓴 이름 그대로 넣습니다. 채널 접미사(_GFA, _메타)까지
+      // 들어가서 관리자 목록에서도 어느 광고로 들어온 건인지 갈립니다. 큐샵 폼의 현장명
+      // 칸은 type=1 단답형 텍스트에 validation=0 이라 아무 글자나 받습니다 (방문시간처럼
+      // 고정 선택지였다면 없는 값이 안 들어갔을 텐데, 그게 아닙니다).
+      // 표를 못 찾았을 때만 상품 제목으로 물러섭니다 (미진열이면 그마저 비어 있습니다).
       var SS = window.FIT_SITE || {};
-      if (f.site) setReactValue(f.site, (SS.baseName ? SS.baseName() : '') || currentSite());
+      if (f.site) setReactValue(f.site, (SS.name ? SS.name() : '') || currentSite());
       if (f.agree && !f.agree.checked) f.agree.click();
 
       await wait(500);
