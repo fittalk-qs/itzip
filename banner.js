@@ -1,22 +1,20 @@
 (function () {
   // 메인홈 아코디언 띠 배너 — 동작.
   //
-  // 큐샵 코드위젯에는 아래 세 줄만 들어갑니다. 현장이 바뀌어도 큐샵은 다시 안 건드립니다.
-  //   <div id="itzip-banner"></div>
-  //   <link rel="stylesheet" href="https://fittalk-qs.github.io/itzip/banner.css">
-  //   <script src="https://fittalk-qs.github.io/itzip/banner.js"></script>
+  // 이 파일은 사람이 고치는 원본입니다. 큐샵에 직접 올리는 파일이 아닙니다.
+  // 「핏톡의 마법도구 > 슬라이드 배너 메이커」가 이 파일과 banner.css 를 통째로 안에 넣고,
+  // 현장 내용(ITZIP_BANNER_DATA)까지 얹어 완성본 한 장을 만들어 줍니다. 팀원은 그것을
+  // 큐샵 코드 블록에 붙여넣습니다.
   //
-  // 글자와 사진은 같은 폴더의 banner.json 에서 읽습니다. 그 json 은 잇집 메이커
-  // (banner-maker.html) 가 만들어 줍니다. 사람이 손으로 쓰는 파일이 아닙니다.
+  // 왜 통째로 넣나: 큐샵 코드 블록이 외부 <script src> 를 막습니다 (2026-08-26 확인).
+  // 그래서 "코드는 깃허브, 내용만 붙여넣기" 는 못 합니다. 대신 사람이 손대는 자리를
+  // 메이커 폼 하나로 좁히는 것으로 같은 목적을 이룹니다.
   //
-  // 왜 내용을 파일로 뺐나: 예전에는 배너 코드와 현장 내용이 한 덩어리라 문구 한 줄을 고치려
-  // 해도 2만 자짜리 코드를 통째로 갈아끼워야 했습니다. 이제 코드는 여기, 내용은 json 이라
-  // 서로를 안 건드립니다.
+  // 고치는 순서: 이 파일(또는 banner.css) 수정 → 깃허브에 올림 → 메이커에서 현장 내용을
+  // 다시 불러와 코드를 새로 뽑아 큐샵에 붙여넣기.
 
-  // banner.json 은 이 파일과 같은 폴더에 있습니다. 주소를 박아 두지 않고 자기 src 에서
-  // 폴더를 떼어 내 씁니다. 그래야 저장소 이름이나 도메인이 바뀌어도 따라오고, 로컬에서
-  // 열어 볼 때도 그 자리의 json 을 읽습니다. src 를 알 수 없으면(코드를 통째로 붙여넣은
-  // 경우) 원래 주소로 물러섭니다.
+  // 아래 JSON_URL 은 이 파일을 밖에서 <script src> 로 불러다 쓰는 경우에만 씁니다
+  // (메이커 미리보기). 큐샵에 붙여넣은 완성본은 내용을 이미 품고 있어 여기까지 안 옵니다.
   var HERE = (function () {
     try {
       var s = document.currentScript && document.currentScript.src;
@@ -252,8 +250,17 @@
 
   // 메이커의 미리보기는 fetch 대신 직접 데이터를 밀어 넣습니다.
   window.itzipBanner = { render: render };
+
+  function start() {
+    // 큐샵에 붙여넣은 코드에는 내용(ITZIP_BANNER_DATA)이 같이 들어 있습니다.
+    // 그럴 때는 아무것도 받아오지 않고 바로 그립니다. 큐샵 코드블록이 외부 스크립트를
+    // 막기 때문에 실제 라이브는 늘 이 길로 갑니다. 아래 boot() 은 이 파일을 밖에서
+    // 불러다 쓰는 곳(메이커 미리보기 등)을 위해 남겨 둡니다.
+    if (window.ITZIP_BANNER_DATA) { render(window.ITZIP_BANNER_DATA); return; }
+    boot();
+  }
   if (!window.ITZIP_BANNER_MANUAL) {
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-    else boot();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
   }
 })();
