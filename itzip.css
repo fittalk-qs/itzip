@@ -23,7 +23,9 @@
 .izv-row>figure{flex:1 1 100%}
 
 /* PC 에서 숏츠만 반 폭. 홀수로 남은 마지막 한 장은 그 줄에 혼자 남아 flex-grow 로 줄을
-   다 채웁니다. 개수를 세는 코드가 따로 필요 없습니다. 모바일은 위 기본값이라 한 줄에 하나. */
+   다 채웁니다. 개수를 세는 코드가 따로 필요 없습니다. 모바일은 위 기본값이라 한 줄에 하나.
+   숏츠가 딱 하나뿐인 페이지에서는 860 폭에 9:16 이라 카드 높이가 1529px 까지 갑니다.
+   그래도 줄을 다 먹는 쪽이 맞습니다(2026-08-31 확인). 반 폭으로 묶지 마세요. */
 @media(min-width:720px){.izv-row>figure.izv-s{flex:1 1 calc(50% - 6px)}}
 
 .izv{display:block;text-decoration:none;color:inherit;cursor:pointer}
@@ -33,7 +35,13 @@
 
 /* absolute 로 깔아야 합니다. height:100% 는 부모 높이가 확정돼 있어야 먹는데 상자 높이는
    aspect-ratio 가 만들어 낸 값이라 퍼센트 기준이 안 잡히고, 그러면 이미지가 원본 높이
-   (1280px)로 서서 카드 아래쪽이 검게 남습니다. 폭 넓은 PC 에서 특히 크게 티가 납니다. */
+   (1280px)로 서서 카드 아래쪽이 검게 남습니다. 폭 넓은 PC 에서 특히 크게 티가 납니다.
+
+   폭·높이는 여기 적어 둬도 안 먹습니다. 큐샵이 상세설명 안 이미지에 width/height:auto 를
+   !important 로 걸어 두는데 선택자에 id 가 껴 있어서, 이 규칙에 !important 를 붙여도 집니다.
+   figure 가 당하던 것과 같은 규칙이 img 에도 있는 겁니다. 그래서 실제로 상자를 채우는 값은
+   itzip-5-media.js 가 img 태그에 인라인 style 로 박아 넣습니다(인라인 !important 만 이깁니다).
+   여기 남겨 둔 width/height 는 그 인라인이 없는 경우를 위한 보험입니다. */
 .izv-b img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block}
 
 /* 재생 버튼. z-index 를 주는 것은 위 이미지가 absolute 라 그냥 두면 원이 이미지 밑에 깔리기 때문입니다. */

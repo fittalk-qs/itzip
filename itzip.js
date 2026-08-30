@@ -1416,8 +1416,13 @@ window.FIT_BRAND = {
       if (!asked[id]) { asked[id] = 1; fresh.push(id); }
       post(id, function (s, t) {
         g.className = 'media ' + (t ? 'izv-s' : 'izv-l');
+        // 인라인 style 은 취향이 아닙니다. 큐샵이 상세설명 안 img 에 width/height:auto 를
+        // id 낀 선택자 + !important 로 걸어 둬서, css 파일에서는 !important 를 붙여도 못 이깁니다.
+        // 인라인 !important 만 이깁니다. 없으면 세로 포스터가 720x1280 원본 크기로 서고
+        // 카드 오른쪽·아래가 검게 남습니다. 자세한 내용은 itzip-5-media.css 주석에.
         g.innerHTML = '<a class=izv><span class=izv-b>' +
-          (s ? '<img loading=lazy alt="" src="' + s + '">' : '') + '</span><span class=izv-t></span></a>';
+          (s ? '<img loading=lazy alt="" style="width:100%!important;height:100%!important" src="' + s + '">' : '') +
+          '</span><span class=izv-t></span></a>';
         rows(); paint();
       });
     });
