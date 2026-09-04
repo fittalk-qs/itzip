@@ -110,13 +110,10 @@ window.FIT_BRAND = {
     }
     var hs = document.getElementById('headerSection');
     if (hs) {
-      var hdrDark = dark;
-      var ovEl = document.getElementById('fit-ov'), ovUp = false;
-      if (ovEl) { try { var oc = getComputedStyle(ovEl); ovUp = oc.display !== 'none' && oc.visibility !== 'hidden' && parseFloat(oc.opacity) > 0.1; } catch (e) { ovUp = true; } }
-      if (!ovUp) {
-        var rx = document.documentElement.clientWidth - 120;
-        hdrDark = bgLumAt(rx, cy) > 140;
-      }
+      // Header colour is probed at the right end of the bar, not at the logo spot, because the
+      // menu sits there and can be over a different background than the wordmark.
+      var rx = document.documentElement.clientWidth - 120;
+      var hdrDark = bgLumAt(rx, cy) > 140;
       hs.style.setProperty('--fit-hdr', hdrDark ? LOGO_DARK : LOGO_LIGHT); // QShop header menu text follows this
     }
   }
@@ -222,41 +219,32 @@ window.FIT_BRAND = {
 
 /* ===== core-3-tidy.js ===== */
 (function () {
-  var fix = null;
+  // Every page wears the same white header now. It used to be transparent on the home page so the
+  // scroll intro could show through it, and body.fit-nothome was the switch that held the white off
+  // just there. The intro went on 2026-09-04, so there is nothing left to switch on: these rules
+  // apply everywhere and the class is gone. The home page used to need a second copy of them pasted
+  // into its own page footer, because it never received that class - that copy is gone too.
   var pin = document.createElement('style');
-  pin.textContent = 'body.fit-nothome #fit-logo{opacity:1 !important}'
-    + 'body.fit-nothome #main::before{display:none !important}'
-    + 'body.fit-nothome{background-color:#ffffff !important}'
-    + 'body.fit-nothome #headerSection{background-color:#ffffff !important}'
-    + 'body.fit-nothome #headerSection [data-type=button] span,body.fit-nothome #headerSection [data-type=button] p{color:#1b1b1b !important}'
-    + 'body.fit-nothome #headerSection [data-type=pageMenu] a{color:#1b1b1b !important;-webkit-text-fill-color:#1b1b1b !important}'
-    + '#headerSection [data-type=pageMenu] a,#headerSection [data-type=button] span,#headerSection [data-type=button] p{color:var(--fit-hdr,#1b1b1b) !important;-webkit-text-fill-color:var(--fit-hdr,#1b1b1b) !important}';
+  pin.textContent = '#fit-logo{opacity:1 !important}'
+    + 'body{background-color:#ffffff !important}'
+    + '#headerSection{background-color:#ffffff !important}'
+    + '#headerSection [data-type=button] span,#headerSection [data-type=button] p{color:#1b1b1b !important}'
+    + '#headerSection [data-type=pageMenu] a{color:#1b1b1b !important;-webkit-text-fill-color:#1b1b1b !important}';
   (document.head || document.documentElement).appendChild(pin);
   function tidy() {
-    var homeId = (window.FIT_BRAND || {}).homeId;   // null until the site has a home grid id
-    var home = window.__FIT_FORCE || (homeId ? document.getElementById(homeId) : null);
-    if (document.body) document.body.classList.toggle('fit-nothome', !home);
-    var ov = document.getElementById('fit-ov');
     var lg = document.getElementById('fit-logo');
-    if (lg && !home) lg.style.opacity = '1';
-    if (!home) {
-      var g0 = document.querySelector('#main [data-type="grid"][data-index="0"]');
-      if (g0) g0.style.setProperty('background-color', 'transparent', 'important');
-      // inner header block goes transparent so the white on #headerSection shows through
-      var hg = document.querySelector('#headerSection [data-type="header"]');
-      if (hg) hg.style.setProperty('background-color', 'transparent', 'important');
-    }
-    if (!home && ov) {
-      ov.remove();
-      var sc = document.getElementById('fit-scrim'); if (sc) sc.remove();
-      if (!fix) {
-        fix = document.createElement('style'); fix.id = 'fit-tidy';
-        fix.textContent = '#main::before{display:none !important}body{background-color:#ffffff !important}';
-        (document.head || document.documentElement).appendChild(fix);
-      }
-    } else if (home && fix) {
-      fix.remove(); fix = null;
-    }
+    if (lg) lg.style.opacity = '1';
+    // inner header block goes transparent so the white on #headerSection shows through
+    var hg = document.querySelector('#headerSection [data-type="header"]');
+    if (hg) hg.style.setProperty('background-color', 'transparent', 'important');
+    // Banner pages only, and the one reason this part still has to know where it is standing.
+    // The first grid on those pages holds the banner widget and has to be see-through so the
+    // banner sits flush under the header. The home page must NOT get this: its first grid is a
+    // content section, and blanking it would silently undo any background set in the page editor.
+    var homeId = (window.FIT_BRAND || {}).homeId;   // null until the site has a home grid id
+    if (homeId && document.getElementById(homeId)) return;
+    var g0 = document.querySelector('#main [data-type="grid"][data-index="0"]');
+    if (g0) g0.style.setProperty('background-color', 'transparent', 'important');
   }
   setInterval(tidy, 200);
   window.addEventListener('popstate', tidy);
