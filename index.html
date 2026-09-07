@@ -290,6 +290,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
             <button class=on data-m=ceo>대표님</button>
             <button data-m=mgr>부장님 <span>어드민 O</span></button>
             <button data-m=mgrShort>부장님 <span>어드민 X</span></button>
+            <button data-m=none>호칭 없음</button>
           </span>
           <!-- 인사말의 "OO 홈페이지" 자리에 그대로 들어가는 말입니다. -->
           <span class=grp>
@@ -482,12 +483,14 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   var TAIL = '※ 로그인 후 [콘텐츠 > 입력폼 관리 > 방문예약] 메뉴를 순서대로 클릭하시면, ' +
     '광고를 통해 문의주신 고객 정보를 한 번에 편리하게 관리하실 수 있습니다.';
 
-  // 보내는 곳에 따라 세 벌. 다른 것은 인사말(호칭)과 어드민 안내를 붙이느냐뿐이라
-  // 본문을 세 번 쓰지 않고 이 표만 갈아 끼웁니다.
+  // 보내는 곳에 따라 네 벌. 다른 것은 인사말(호칭)과 어드민 안내를 붙이느냐뿐이라
+  // 본문을 네 번 쓰지 않고 이 표만 갈아 끼웁니다.
+  // who 가 비면 호칭과 뒤의 쉼표를 통째로 빼고 현장명부터 시작합니다.
   var MODE = {
     ceo:      { who: '대표님', admin: true },
     mgr:      { who: '부장님', admin: true },
-    mgrShort: { who: '부장님', admin: false }
+    mgrShort: { who: '부장님', admin: false },
+    none:     { who: '',      admin: true }
   };
   var mode = 'ceo';
 
@@ -552,7 +555,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
     var ok = !!(nm && b) && (!m.admin || !!(id && pw));
 
     ROUT.value = !ok ? '' :
-      m.who + ', ' + nm + ' ' + DEV[dev] + ' 홈페이지 보고드립니다.\n\n' +
+      (m.who ? m.who + ', ' : '') + nm + ' ' + DEV[dev] + ' 홈페이지 전달드립니다.\n\n' +
       '홈페이지 : ' + b + '/' +
       (m.admin
         ? '\n관리자페이지 : ' + b + '/admin' +
