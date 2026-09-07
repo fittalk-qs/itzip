@@ -176,8 +176,13 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
 .fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 @media(max-width:700px){.two,.fields{grid-template-columns:1fr}}
 .fields .hint{display:block;font-size:10.5px;font-weight:600;color:#b5a496;margin-top:5px}
-/* 보고 대상 고르기. 셋의 차이는 인사말과 어드민 안내 유무, 그 둘뿐입니다. */
-.modes{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 10px}
+/* 보고 대상 고르기. 셋의 차이는 인사말과 어드민 안내 유무, 그 둘뿐입니다.
+   묶음이 둘입니다 — 누구에게 보내나(호칭·어드민) / 무엇을 만들었나(모바일·PC).
+   서로 상관없는 축이라 한 줄에 두되 선으로 갈라 놓았습니다. */
+.modes{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+.modes .grp{display:flex;gap:7px;flex-wrap:wrap}
+.modes .grp+.grp{padding-left:13px;border-left:2px solid var(--line)}
+@media(max-width:520px){.modes .grp+.grp{padding-left:0;border-left:0}}
 .modes button.on{background:var(--lilac)}
 .modes button span{font-weight:600;font-size:10.5px;opacity:.72;margin-left:4px}
 /* 높이는 JS 가 줄 수에 맞춰 rows 로 잡습니다. 짧은 버전(홈페이지 한 줄)일 때
@@ -281,9 +286,16 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
       <div>
         <p class=lg>보낼 안내문 <span class=cnt id=rfState></span></p>
         <div class=modes>
-          <button class=on data-m=ceo>대표님</button>
-          <button data-m=mgr>부장님 <span>어드민 O</span></button>
-          <button data-m=mgrShort>부장님 <span>어드민 X</span></button>
+          <span class=grp>
+            <button class=on data-m=ceo>대표님</button>
+            <button data-m=mgr>부장님 <span>어드민 O</span></button>
+            <button data-m=mgrShort>부장님 <span>어드민 X</span></button>
+          </span>
+          <!-- 인사말의 "OO 홈페이지" 자리에 그대로 들어가는 말입니다. -->
+          <span class=grp>
+            <button class=on data-d=mo>모바일</button>
+            <button data-d=mopc>모바일+PC</button>
+          </span>
         </div>
         <textarea id=rfOut class=mono readonly spellcheck=false></textarea>
         <div class=bar><button class=go2 id=rfCopy>전체 복사</button></div>
@@ -343,7 +355,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   </div>
 
   <div class=foot>
-    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.0</span><s></s>만든 사람 김종민</span>
+    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.1</span><s></s>만든 사람 김종민</span>
     <p class=sub>2026-08-26 · <code>fittalk-qs/itzip</code></p>
   </div>
 </div>
@@ -479,6 +491,11 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   };
   var mode = 'ceo';
 
+  // 만든 범위. 값이 곧 인사말에 박히는 말이라 여기 글자를 고치면 안내문도 바뀝니다.
+  // 대부분 모바일만 만들므로 그것이 기본입니다.
+  var DEV = { mo: '모바일', mopc: '모바일+PC' };
+  var dev = 'mo';
+
   var SEP = '[-.\\s~)）]';                       // 1533-8409 / 051)519~7649 / 010 5567 7585
   var RE_MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
   var RE_HP = new RegExp('01[016789]' + SEP + '?\\d{3,4}' + SEP + '?\\d{4}');
@@ -535,7 +552,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
     var ok = !!(nm && b) && (!m.admin || !!(id && pw));
 
     ROUT.value = !ok ? '' :
-      m.who + ', ' + nm + ' 홈페이지 보고드립니다.\n\n' +
+      m.who + ', ' + nm + ' ' + DEV[dev] + ' 홈페이지 보고드립니다.\n\n' +
       '홈페이지 : ' + b + '/' +
       (m.admin
         ? '\n관리자페이지 : ' + b + '/admin' +
@@ -565,11 +582,15 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
     RSTATE.textContent = (ok && !clash) ? '준비됐어요' : '';
   }
 
+  // 묶음이 둘이라 켜고 끄는 것은 누른 버튼이 든 묶음 안에서만 합니다.
+  // 전체를 훑으면 옆 묶음의 선택이 같이 꺼집니다.
   MODES.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('button') : null;
-    if (!b || !b.hasAttribute('data-m')) return;
-    [].forEach.call(this.querySelectorAll('button'), function (x) { x.classList.toggle('on', x === b); });
-    mode = b.getAttribute('data-m');
+    if (!b) return;
+    var who = b.getAttribute('data-m'), d = b.getAttribute('data-d');
+    if (who === null && d === null) return;
+    [].forEach.call(b.parentNode.querySelectorAll('button'), function (x) { x.classList.toggle('on', x === b); });
+    if (who !== null) mode = who; else dev = d;
     rfBuild();
   });
   /* ── 현장명 자동으로 읽기 ────────────────────────────────────────────
