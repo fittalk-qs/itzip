@@ -446,3 +446,27 @@
   timer = setInterval(function () { if (dead()) report(); }, 800);
   window.addEventListener('load', function () { if (dead()) report(); });
 })();
+
+// Meta Pixel : Form Lead
+<script>
+(function () {
+  var sent = false;
+  function uid(){ return 'lead_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest(
+      'button[type="submit"], input[type="submit"], .btn_submit, .btnSubmit'
+    );
+    if (!btn || sent || !window.fbq) return;
+
+    var form = btn.closest('form');
+    sent = true;
+    setTimeout(function(){ sent = false; }, 3000);
+
+    fbq('track', 'Lead', {
+      content_name: form ? (form.id || form.name || 'form') : 'form',
+      content_category: 'form'
+    }, { eventID: uid() });
+  }, true);
+})();
+</script>
