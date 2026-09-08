@@ -446,3 +446,60 @@
   timer = setInterval(function () { if (dead()) report(); }, 800);
   window.addEventListener('load', function () { if (dead()) report(); });
 })();
+
+/* ===== itzip-head-7-meta.js ===== */
+// 메타 픽셀 전환. 네이버 전환(itzip-head-5-conversion.js)의 NA_SEND 를 감싸서
+// 같은 순간에 같이 쏩니다.
+//
+// fitSendReservation 을 직접 감싸면 안 됩니다. 5번 조각이 defineProperty 로
+// getter/setter 를 걸어 두었기 때문에 무한 재귀가 됩니다.
+// NA_SEND 는 평범한 프로퍼티라 안전하고 발사 시점도 동일합니다.
+(function () {
+  if (window.top !== window.self) return;
+  if (window.FIT_META_CONV) return;   // 큐샵 SPA 가 다시 실행해도 한 번만
+  window.FIT_META_CONV = 1;
+
+  var GAP = 5000;
+  var sent = {};
+  function once(k) {
+    var n = Date.now();
+    if (sent[k] && n - sent[k] < GAP) return false;
+    sent[k] = n;
+    return true;
+  }
+  function uid() {
+    return 'fit_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function hook() {
+    if (typeof window.NA_SEND !== 'function' || window.NA_SEND.__meta) return false;
+    var orig = window.NA_SEND;
+    var wrapped = function (type) {
+      try {
+        if (window.fbq) {
+          if (type === 'schedule' && once('lead')) {
+            window.fbq('track', 'Lead', {
+              content_name: '방문예약',
+              content_category: 'reservation'
+            }, { eventID: uid() });
+          } else if (type !== 'schedule' && once('contact')) {
+            window.fbq('track', 'Contact', {
+              content_name: '전화연결'
+            }, { eventID: uid() });
+          }
+        }
+      } catch (e) {}
+      return orig.apply(this, arguments);
+    };
+    wrapped.__meta = 1;
+    window.NA_SEND = wrapped;
+    return true;
+  }
+
+  if (!hook()) {
+    var left = 40;
+    var t = setInterval(function () {
+      if (hook() || --left <= 0) clearInterval(t);
+    }, 300);
+  }
+})();
