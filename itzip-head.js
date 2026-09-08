@@ -448,25 +448,53 @@
 })();
 
 // Meta Pixel : Form Lead
-<script>
 (function () {
-  var sent = false;
-  function uid(){ return 'lead_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+  if (window.top !== window.self) return;
+  if (window.FIT_META_CONV) return;   // 큐샵 SPA 가 이 파일을 다시 실행해도 한 번만
+  window.FIT_META_CONV = 1;
 
-  document.addEventListener('click', function(e){
-    var btn = e.target.closest && e.target.closest(
-      'button[type="submit"], input[type="submit"], .btn_submit, .btnSubmit'
-    );
-    if (!btn || sent || !window.fbq) return;
+  var GAP = 5000;
+  var sent = {};
+  function once(k) {
+    var n = Date.now();
+    if (sent[k] && n - sent[k] < GAP) return false;
+    sent[k] = n;
+    return true;
+  }
+  function uid() {
+    return 'fit_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  }
 
-    var form = btn.closest('form');
-    sent = true;
-    setTimeout(function(){ sent = false; }, 3000);
+  function hook() {
+    if (typeof window.NA_SEND !== 'function' || window.NA_SEND.__meta) return false;
+    var orig = window.NA_SEND;
+    var wrapped = function (type) {
+      try {
+        if (window.fbq) {
+          if (type === 'schedule' && once('lead')) {
+            window.fbq('track', 'Lead', {
+              content_name: '방문예약',
+              content_category: 'reservation'
+            }, { eventID: uid() });
+          } else if (type !== 'schedule' && once('contact')) {
+            window.fbq('track', 'Contact', {
+              content_name: '전화연결'
+            }, { eventID: uid() });
+          }
+        }
+      } catch (e) {}
+      return orig.apply(this, arguments);
+    };
+    wrapped.__meta = 1;
+    window.NA_SEND = wrapped;
+    return true;
+  }
 
-    fbq('track', 'Lead', {
-      content_name: form ? (form.id || form.name || 'form') : 'form',
-      content_category: 'form'
-    }, { eventID: uid() });
-  }, true);
+  // 5번 조각이 먼저 돌지만, 빌드 순서가 바뀌는 경우를 대비해 잠깐 기다립니다.
+  if (!hook()) {
+    var left = 40;
+    var t = setInterval(function () {
+      if (hook() || --left <= 0) clearInterval(t);
+    }, 300);
+  }
 })();
-</script>
