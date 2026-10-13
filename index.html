@@ -253,7 +253,9 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
       <p>카톡으로 받은 이메일·대표번호·핸드폰을 그대로 붙여넣으면 보고용 안내문으로 바꿔 줍니다.</p>
     </div>
     <div class="bd stack">
-      <!-- 주소가 먼저입니다. 이걸 넣어야 현장명이 저절로 채워지니까요. -->
+      <!-- 주소가 먼저입니다. 이걸 넣으면 현장명이 저절로 채워지니까요. 다만 자동은
+           거들 뿐이고, 현장명은 언제든 손으로 넣거나 고쳐도 됩니다. 손으로 넣은
+           이름은 주소를 바꿔도 지켜집니다. -->
       <div class=two>
         <div>
           <p class=lg>사이트 주소</p>
@@ -262,7 +264,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
         </div>
         <div>
           <p class=lg>현장명 <span class=cnt id=rfNameState></span></p>
-          <input type=text id=rfName spellcheck=false placeholder="주소를 넣으면 자동으로 채워져요">
+          <input type=text id=rfName spellcheck=false placeholder="직접 넣어도 돼요 · 주소 넣으면 자동">
         </div>
       </div>
       <div>
@@ -355,7 +357,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   </div>
 
   <div class=foot>
-    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.2</span><s></s>만든 사람 김종민</span>
+    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.3</span><s></s>만든 사람 김종민</span>
     <p class=sub>2026-08-26 · <code>fittalk-qs/itzip</code></p>
   </div>
 </div>
@@ -627,6 +629,8 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   }
 
   function autoName() {
+    // 손으로 넣어 둔 이름이 있으면 읽으러 가지도 않습니다. 그것을 그대로 씁니다.
+    if (nameManual && NAME.value.trim()) { RNAME.textContent = '직접 넣으셨어요'; return; }
     var b = siteBase(SITE.value);
     if (!b) { RNAME.textContent = ''; return; }
     if (titleCache[b] !== undefined) { putName(titleCache[b]); return; }
@@ -643,13 +647,21 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   }
   function putName(s) {
     if (!s) { RNAME.textContent = '못 읽었어요 · 직접 넣어 주세요'; return; }
+    // 늦게 도착한 답이 손으로 넣은 이름을 덮지 않게 여기서 한 번 더 봅니다.
+    if (nameManual && NAME.value.trim()) { RNAME.textContent = '직접 넣으셨어요'; return; }
     RNAME.textContent = '자동으로 읽었어요';
-    if (nameManual) return;                   // 손으로 고친 뒤에는 덮어쓰지 않습니다
     NAME.value = s;
     rfBuild();
   }
 
-  NAME.addEventListener('input', function () { nameManual = true; rfBuild(); });
+  // 한 글자라도 손으로 넣으면 그 뒤로는 자동이 덮어쓰지 않습니다.
+  // 칸을 도로 비우면 자동으로 돌아갑니다.
+  NAME.addEventListener('input', function () {
+    nameManual = !!NAME.value.trim();
+    RNAME.textContent = nameManual ? '직접 넣으셨어요' : '';
+    rfBuild();
+    if (!nameManual) { clearTimeout(nameTimer); nameTimer = setTimeout(autoName, 300); }
+  });
 
   TXT.addEventListener('input', rfRead);
   SITE.addEventListener('input', function () {
@@ -657,7 +669,8 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
     if (!dig(readReq(TXT.value).rep)) RPW.value = siteNo(siteBase(SITE.value));
     rfBuild();
     // 주소가 바뀌면 현장명도 새로 읽습니다. 글자 칠 때마다 부르지 않게 조금 기다립니다.
-    nameManual = false;
+    // 손으로 넣어 둔 이름은 주소를 바꿔도 그대로 둡니다. 비워 두었을 때만 다시 자동.
+    if (!NAME.value.trim()) nameManual = false;
     clearTimeout(nameTimer);
     nameTimer = setTimeout(autoName, 700);
   });
