@@ -357,7 +357,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   </div>
 
   <div class=foot>
-    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.3</span><s></s>만든 사람 김종민</span>
+    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.4</span><s></s>만든 사람 김종민</span>
     <p class=sub>2026-08-26 · <code>fittalk-qs/itzip</code></p>
   </div>
 </div>
@@ -486,7 +486,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
 
   // 보내는 사람에 따라 네 벌. 다른 것은 인사말 호칭과 안내문 길이뿐이라
   // 본문을 네 번 쓰지 않고 이 표만 갈아 끼웁니다.
-  //   full: true  = 관리자페이지 · 방문예약 확인 · ※ 안내까지 전부
+  //   full: true  = 관리자페이지 · 방문예약 페이지 · ※ 안내까지 전부
   //   full: false = 홈페이지 · 입력폼관리페이지 · 아이디 · 비밀번호 네 줄만
   // 버튼 이름(김부장님, 이성빈 부장님)은 누구 것인지 고르는 표시이고, 인사말에는
   // who 만 들어갑니다. who 가 비면 호칭과 뒤의 쉼표를 통째로 빼고 현장명부터 시작합니다.
@@ -565,7 +565,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
       '\n입력폼관리페이지 : ' + b + '/admin/contents/form' +
       '\n아이디 : ' + id +
       '\n비밀번호 : ' + pw +
-      (m.full ? '\n방문예약 확인 : ' + b + '/contact\n\n' + TAIL : '');
+      (m.full ? '\n방문예약 페이지 : ' + b + '/contact\n\n' + TAIL : '');
     // 긴 ※ 줄이 두세 줄로 접히므로 여유를 더 줍니다
     ROUT.rows = Math.max(4, ROUT.value.split('\n').length + 3);
 
