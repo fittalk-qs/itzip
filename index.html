@@ -78,6 +78,12 @@ body{margin:0;color:var(--ink);background:var(--cream);
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 34px}
 /* 혼자 있는 카드는 반쪽만 차지하면 허전해서 한 줄을 다 씁니다 */
 .cards.one{grid-template-columns:1fr}
+/* 카드 밑에 다는 곁다리 줄. 카드 자리를 뺏지 않게 작고 조용하게. */
+.aside{margin:-22px 0 34px;padding:12px 15px;background:var(--paper);
+  border:2px dashed var(--line);border-radius:14px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.aside a{color:var(--grape);text-underline-offset:3px}
+.aside span{display:block;margin-top:5px;font-size:12px;font-weight:600;line-height:1.7;color:#a8968a}
+.aside b{color:var(--ink)}
 @media(max-width:700px){.cards{grid-template-columns:1fr}}
 .card{display:flex;flex-direction:column;text-decoration:none;color:inherit;
   background:var(--paper);border:2px solid var(--ink);border-radius:20px;overflow:hidden;
@@ -319,6 +325,14 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
       </div>
     </a>
   </div>
+  <!-- 카드가 <a> 라서 그 안에 또 링크를 넣을 수 없습니다. 그래서 밖에 따로 답니다.
+       여기 올려 둔 에디터는 동시 접속 알림이 꺼진 채로 돕니다 (깃허브 Pages 는
+       POST 를 못 받습니다). 그 기능까지 쓰려면 아래 zip 을 사내 서버에서 켭니다. -->
+  <p class=aside>여럿이 같이 쓰려면 →
+    <a href="landing-editor-server.zip">사내 서버용 내려받기 (zip, 4MB)</a>
+    <span>누가 어떤 현장을 열고 있는지 서로 보입니다. 서버 컴퓨터에 Node.js 18 이상 필요 ·
+      푼 폴더의 <b>서버_시작.bat</b> 더블클릭 · 자세한 것은 안에 든 <b>실행방법.txt</b></span>
+  </p>
 
   <div class=sec><b>잇집</b><em>잇집 홈페이지에만 쓰는 것들</em></div>
   <div class=cards>
@@ -372,7 +386,7 @@ input[readonly]{background:#f3ece4;color:var(--ink-2);border-style:dashed}
   </div>
 
   <div class=foot>
-    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.6</span><s></s>만든 사람 김종민</span>
+    <span class=tag><b>핏톡의 마법도구</b><span class=v>v1.7</span><s></s>만든 사람 김종민</span>
     <p class=sub>2026-08-26 · <code>fittalk-qs/itzip</code></p>
   </div>
 </div>
