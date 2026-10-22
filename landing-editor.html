@@ -70,7 +70,7 @@
   [hidden] { display: none !important; }
   ::selection { background: var(--accent); color: var(--accent-ink); }
   em { font-style: normal; }
-  .tb-c svg, .side svg, .tree svg, .zoom svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .tb-c svg, .side svg, .tree svg, .zoom svg, .cv-tools svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* ---------- 위쪽 바 ---------- */
@@ -93,6 +93,17 @@
   .pg:hover { background: var(--hover); }
   .pg.is-on { background: var(--accent-soft); color: var(--accent); }
   .pg-add { color: var(--sub); }
+  .pg-group { display: inline-flex; align-items: center; gap: 4px; }
+  .pg-sub { padding: 1px 6px; border-radius: 5px; background: var(--surface); font-size: 11.5px; font-weight: 700; }
+  .pg-caret { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; }
+  .pg-pop { position: fixed; z-index: 70; min-width: 220px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: 0 12px 32px oklch(21% 0.012 260 / .18); }
+  .pg-pop-head { padding: 6px 10px 4px; font-size: 11.5px; font-weight: 700; color: var(--sub); }
+  .pg-item { display: grid; width: 100%; padding: 8px 10px; border: 0; border-radius: 7px; background: none; color: var(--ink); text-align: left; cursor: pointer; line-height: 1.35; }
+  .pg-item:hover { background: var(--hover); }
+  .pg-item.is-on { background: var(--accent-soft); color: var(--accent); }
+  .pg-item b { font-size: 13px; }
+  .pg-item span { font-size: 11.5px; color: var(--sub); }
+  #tb-mode { flex: none; }
   .tb-r { display: flex; align-items: center; gap: 6px; }
   .team-pill { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .team-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px oklch(58% 0.14 155 / .2); }
@@ -189,6 +200,19 @@
   .add-tile { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .add-tile:hover { border-color: var(--accent); }
   .add-tile svg { width: 15px; height: 15px; color: var(--accent); }
+  .add-tile.big { font-weight: 700; }
+  .sec-no.is-pend, .tr-no.is-pend { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-2); color: var(--sub); }
+  .tr-no.is-pend { border-radius: 6px; height: 22px; line-height: 22px; }
+  /* 빈 섹션: 무엇을 넣을지 고르기 */
+  .sec-pick { padding: 4px 0 6px; }
+  .pick-q { margin: 0 0 10px; font-size: 13px; font-weight: 700; }
+  .pick-grid { display: grid; gap: 8px; }
+  .pick { display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 12px; border: 1.5px dashed var(--line-2); border-radius: var(--radius); background: var(--surface-2); color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+  .pick:hover, .pick.is-drag-over { border-color: var(--accent); background: var(--accent-soft); }
+  .pick svg { grid-row: 1 / 3; width: 34px; height: 34px; padding: 7px; border-radius: 8px; background: var(--surface); color: var(--accent); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .pick b { font-size: 14px; }
+  .pick span { font-size: 12px; color: var(--sub); }
+  .sec-body.is-drag-over { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 8px; }
   .paste-btn { width: 100%; height: 34px; margin-top: 6px; padding: 0 10px; border: 1.5px dashed var(--accent); border-radius: 8px; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 700; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .side-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; padding: 8px; border-top: 1px solid var(--panel-line); }
   .side-nav button:last-child { grid-column: 1 / -1; }
@@ -224,8 +248,9 @@
   .cv-pill.warn { color: var(--warn-ink); }
   .cv-pill.warn::before { content: '!'; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; border-radius: 50%; background: var(--warn); color: oklch(99% 0 0); font-size: 11px; font-weight: 800; }
   .cv-pill.warn.is-err::before { background: var(--err); }
-  .cv-hint { position: absolute; right: 14px; bottom: 14px; z-index: 6; margin: 0; padding: 6px 10px; border-radius: 999px; background: var(--panel); color: var(--sub); font-size: 11.5px; box-shadow: var(--float-shadow); pointer-events: none; }
-  .canvas.is-empty .cv-tools, .canvas.is-empty .cv-hint { display: none; }
+  .cv-tools > .seg { height: 34px; align-items: center; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--float-shadow); }
+  .cv-hint { position: absolute; right: 14px; top: 14px; z-index: 6; margin: 0; padding: 6px 10px; border-radius: 999px; background: var(--panel); color: var(--sub); font-size: 11.5px; box-shadow: var(--float-shadow); pointer-events: none; }
+  .canvas.is-empty .cv-tools, .canvas.is-empty .cv-hint, .cv-hint.is-done { display: none; }
 
   /* 오른쪽: 설정 (보기마다 칸 하나) */
   .insp { min-height: 0; background: var(--panel); border-left: 1px solid var(--panel-line); }
@@ -461,8 +486,8 @@
     <span class="tb-sub"><span id="tb-site">현장명 없음</span><span class="save-state" id="save-state" aria-live="polite"></span></span>
   </div>
   <div class="tb-c">
+    <div class="seg" id="tb-mode" role="group" aria-label="사이트 방식"><button type="button" data-v="single" title="원페이지 하나">모바일형</button><button type="button" data-v="menu" title="원페이지 + 메뉴별 페이지">모바일+메뉴형</button></div>
     <nav class="pg-tabs" id="pg-tabs" aria-label="페이지"></nav>
-    <div class="seg" id="pv-device" role="group" aria-label="미리보기 화면"><button class="is-on" data-v="mobile" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>모바일</button><button data-v="pc" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6M12 16v4"/></svg>PC</button></div>
   </div>
   <div class="tb-r">
     <button class="team-pill" id="team-pill" type="button" hidden></button>
@@ -481,6 +506,7 @@
   </div>
 </header>
 
+<div class="pg-pop" id="pg-pop" role="menu" hidden></div>
 <div class="peer-warn" id="peer-warn" role="alert" hidden></div>
 <main class="layout">
   <aside class="side" aria-label="섹션 목록">
@@ -489,10 +515,10 @@
     <div class="side-add">
       <span class="side-lab">섹션 추가</span>
       <div class="add-grid">
-        <button class="add-tile" type="button" id="add-sec"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>이미지</button>
-        <button class="add-tile" type="button" id="add-text"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M12 6v13M9 19h6"/></svg>글</button>
-        <button class="add-tile" type="button" id="add-video"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2.5v9L17 14"/></svg>영상</button>
-        <button class="add-tile" type="button" id="add-form"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>방문예약 폼</button>
+        <button class="add-tile big" type="button" id="add-sec" title="새 섹션을 넣고 오른쪽에서 이미지·글·영상 중에 골라요"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>섹션 추가</button>
+        <button class="add-tile" type="button" id="add-text" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M12 6v13M9 19h6"/></svg>글</button>
+        <button class="add-tile" type="button" id="add-video" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2.5v9L17 14"/></svg>영상</button>
+        <button class="add-tile" type="button" id="add-form"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>방문예약 폼</button>
       </div>
       <button class="paste-btn" type="button" id="paste-sec" title="고른 섹션 바로 아래에 넣어요 (안 골랐으면 맨 아래에). Ctrl+V도 돼요" hidden></button>
     </div>
@@ -516,6 +542,7 @@
     </div>
     <div class="cv-pan" id="cv-pan" hidden></div>
     <div class="cv-tools">
+      <div class="seg" id="pv-device" role="group" aria-label="미리보기 화면"><button class="is-on" data-v="mobile" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>모바일</button><button data-v="pc" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6M12 16v4"/></svg>PC</button></div>
       <div class="zoom" role="group" aria-label="확대·축소">
         <button type="button" id="zoom-out" title="축소 (Ctrl -)" aria-label="축소">−</button>
         <button type="button" id="zoom-val" title="100%로 (Ctrl 0)">100%</button>
@@ -525,7 +552,7 @@
       <button class="cv-pill" type="button" id="pv-intro">▶ 인트로 보기</button>
       <button class="cv-pill warn" type="button" id="cv-checks" hidden></button>
     </div>
-    <p class="cv-hint">Ctrl+휠 확대·축소 · 스페이스바 누른 채 끌면 화면 이동</p>
+    <p class="cv-hint" id="cv-hint">Ctrl+휠 확대·축소 · 스페이스+끌기 이동</p>
     <span id="pv-info" hidden></span>
   </section>
 
@@ -659,7 +686,7 @@
       <h2><span class="no">4</span>메뉴 페이지</h2>
       <div class="field">
         <span class="lab">메뉴 방식</span>
-        <div class="seg" id="f-mode"><button type="button" data-v="single">원페이지만</button><button type="button" data-v="menu">원페이지 + 메뉴 페이지</button></div>
+        <div class="seg" id="f-mode"><button type="button" data-v="single">모바일형</button><button type="button" data-v="menu">모바일+메뉴형</button></div>
         <div class="note" id="mode-note"></div>
       </div>
       <div id="menus-body">
@@ -1151,7 +1178,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         var vs = videoSection({ vsrc: 'file' });
         if (await setVideoFile(vs, vids[vi])) { insertByOrder(vs); vAdded++; }
       }
-      if (vAdded && !files.length) { render(); toast('영상 ' + vAdded + '개를 영상 섹션으로 넣었어요. 4번에서 위치를 옮길 수 있어요'); return; }
+      if (vAdded && !files.length) { render(); toast('영상 ' + vAdded + '개를 영상 섹션으로 넣었어요. 왼쪽 목록에서 끌어서 위치를 옮길 수 있어요'); return; }
     }
     if (!files.length) { if (!vids.length) toast('이미지(PNG·JPG·WebP)나 영상(mp4·webm)만 올릴 수 있어요'); return; }
     files.sort(function (a, b) { return natural(a.name, b.name); });
@@ -1183,7 +1210,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     afterImagesChanged();
     render();
     lastPlaced = placed;
-    toast(added + '장을 자리 잡았어요' + (placed.length ? ' (' + placed.map(function (p) { return p.split(' ←')[0]; }).join('·') + ' 포함)' : '') + '. 오른쪽 미리보기로 확인해 주세요.');
+    toast(added + '장을 자리 잡았어요' + (placed.length ? ' (' + placed.map(function (p) { return p.split(' ←')[0]; }).join('·') + ' 포함)' : '') + '. 가운데 미리보기로 확인해 주세요.');
   }
   var lastPlaced = [];
 
@@ -1699,9 +1726,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var px = (st.scrollLeft + cx - r.left - frame.offsetLeft) / old, py = (st.scrollTop + cy - r.top - frame.offsetTop) / old;
     pv.fit = false; pv.zoom = z;
     layoutPreview();
+    hintDone();
     st.scrollLeft = frame.offsetLeft + px * z - (cx - r.left);
     st.scrollTop = frame.offsetTop + py * z - (cy - r.top);
   }
+  // 확대·이동을 한 번 써 보면 안내 글은 다음부터 안 보임
+  function hintDone() {
+    var h = $('#cv-hint'); if (!h || h.classList.contains('is-done')) return;
+    h.classList.add('is-done');
+    try { localStorage.setItem('bunyang-editor-hint', '1'); } catch (e) {}
+  }
+  try { if (localStorage.getItem('bunyang-editor-hint') === '1') $('#cv-hint').classList.add('is-done'); } catch (e) {}
   function zoomStep(dir) {
     var z = curScale(), next = dir > 0 ? ZOOMS.find(function (v) { return v > z + 0.001; }) : ZOOMS.slice().reverse().find(function (v) { return v < z - 0.001; });
     setZoom(next == null ? z : next);
@@ -1726,10 +1761,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
   function renderMode() {
     var mm = isMenuMode();
-    $$('#f-mode button').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-v') === (mm ? 'menu' : 'single')); });
+    $$('#f-mode button, #tb-mode button').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-v') === (mm ? 'menu' : 'single')); });
     $('#mode-note').textContent = mm
-      ? '메인 원페이지는 그대로 두고, 헤더 밑에 메뉴 줄을 달아요. 메뉴마다 따로 된 페이지(주소·이미지·글)를 만들어요. 메뉴 페이지는 PC에서 화면 전체로 넓게 보여요(내용 폭 1200px). 왼쪽 위 버튼은 \'자세히 보기\'(메인으로), PC 오른쪽 메뉴는 그 페이지 섹션으로 이동해요.'
-      : '메인 원페이지 하나만 만들어요. 왼쪽 위 메뉴를 누르면 섹션으로 이동해요.';
+      ? '모바일+메뉴형: 메인 원페이지는 그대로 두고, 헤더 밑에 메뉴 줄을 달아요. 메뉴마다 따로 된 페이지(주소·이미지·글)를 만들어요. 메뉴 페이지는 PC에서 화면 전체로 넓게 보여요(내용 폭 1200px). 왼쪽 위 버튼은 \'자세히 보기\'(메인으로), PC 오른쪽 메뉴는 그 페이지 섹션으로 이동해요.'
+      : '모바일형: 메인 원페이지 하나만 만들어요. 왼쪽 위 메뉴를 누르면 섹션으로 이동해요.';
   }
   var SECS_DESC = null;
   function renderEditBar() {
@@ -1798,13 +1833,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     $$('#panel > .card').forEach(function (c) { if (c.hidden) return; var no = $('h2 .no', c); if (no) no.textContent = ++n; });
   }
   // 미리볼 페이지: 원페이지만이면 [메인][방문예약], 메뉴 방식이면 고르는 칸
+  var CARET = '<svg class="pg-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   function renderPvPages() {
     var mm = isMenuMode();
-    var tabs = [['main', '메인', ''], ['contact', '방문예약', '']].concat(mm ? menuPages().map(function (x) { return [x.page.slug, x.page.name || '새 메뉴', x.parent ? x.parent.name : '']; }) : []);
-    if (!tabs.some(function (t) { return t[0] === pv.page; })) pv.page = 'main';
-    $('#pg-tabs').innerHTML = tabs.map(function (t) {
-      return '<button type="button" class="pg' + (t[0] === pv.page ? ' is-on' : '') + '" data-pg="' + esc(t[0]) + '"' + (t[2] ? ' title="' + esc(t[2] + ' › ' + t[1]) + '"' : '') + '>' + esc(t[1]) + '</button>';
-    }).join('') + '<button type="button" class="pg pg-add" data-pg="+" title="메뉴 페이지 더하기">+ 페이지</button>';
+    var ok = ['main', 'contact'].concat(mm ? menuPages().map(function (x) { return x.page.slug; }) : []);
+    if (ok.indexOf(pv.page) < 0) pv.page = 'main';
+    var tab = function (v, name, extra) { return '<button type="button" class="pg' + (v === pv.page ? ' is-on' : '') + '" data-pg="' + esc(v) + '"' + (extra || '') + '>' + esc(name) + '</button>'; };
+    var out = [tab('main', '메인'), tab('contact', '방문예약')];
+    if (mm) (state.menus || []).forEach(function (m, a) {
+      var kids = m.children || [];
+      if (!kids.length) { out.push(tab(m.slug, m.name || '새 메뉴')); return; }
+      var cur = kids.find(function (c) { return c.slug === pv.page; });
+      out.push('<button type="button" class="pg pg-group' + (cur ? ' is-on' : '') + '" data-pg-group="' + a + '" aria-haspopup="menu" title="소메뉴 ' + kids.length + '개">' +
+        esc(m.name || '새 메뉴') + (cur ? '<span class="pg-sub">' + esc(cur.name) + '</span>' : '') + CARET + '</button>');
+    });
+    $('#pg-tabs').innerHTML = out.join('') + '<button type="button" class="pg pg-add" data-pg="+" title="메뉴 페이지 더하기">+ 페이지</button>';
+    closePgPop();
+  }
+  function closePgPop() { var p = $('#pg-pop'); if (p) p.hidden = true; }
+  function openPgPop(btn) {
+    var m = state.menus[+btn.getAttribute('data-pg-group')], p = $('#pg-pop');
+    if (!m || !p) return;
+    p.innerHTML = '<div class="pg-pop-head">' + esc(m.name) + '</div>' + (m.children || []).map(function (c) {
+      return '<button type="button" class="pg-item' + (c.slug === pv.page ? ' is-on' : '') + '" data-pg="' + esc(c.slug) + '"><b>' + esc(c.name || '새 메뉴') + '</b><span>/' + esc(c.slug) + ' · ' + ((c.sections || []).filter(filled).length ? '섹션 ' + (c.sections || []).filter(filled).length + '개' : '비어 있음') + '</span></button>';
+    }).join('');
+    var r = btn.getBoundingClientRect();
+    p.style.left = Math.round(Math.min(r.left, window.innerWidth - 240)) + 'px'; p.style.top = Math.round(r.bottom + 6) + 'px';
+    p.hidden = false;
   }
   function renderIntro() {
     $$('#f-intro button').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-v') === state.introMode); });
@@ -1897,7 +1952,20 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       (s.header ? '<button class="btn small danger" type="button" data-act="sec-header-del" data-sec="' + i + '">빼기</button>' : '') + '</div></div>';
   }
   // 섹션 칸 안쪽: 보기 방식 → (제목 이미지) → 이미지 목록 → (슬라이드면 화살표 위치)
+  var PICK_IC = {
+    img: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
+    text: '<svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13M9 19h6"/></svg>',
+    video: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2.5v9L17 14"/></svg>'
+  };
+  function pickBody(s, i) {
+    return '<div class="sec-pick"><p class="pick-q">이 섹션에 무엇을 넣을까요?</p><div class="pick-grid">' +
+      '<label class="pick" data-drop="img-end" data-sec="' + i + '">' + PICK_IC.img + '<b>이미지</b><span>파일 고르기 · 여기로 끌어다 놓기</span><input type="file" accept="image/*" multiple hidden data-act="sec-add" data-sec="' + i + '"></label>' +
+      '<button class="pick" type="button" data-act="sec-to" data-v="text" data-sec="' + i + '">' + PICK_IC.text + '<b>글</b><span>제목·안내 문구</span></button>' +
+      '<button class="pick" type="button" data-act="sec-to" data-v="video" data-sec="' + i + '">' + PICK_IC.video + '<b>영상</b><span>유튜브 링크 · mp4</span></button>' +
+      '</div></div>';
+  }
   function sectionBody(s, i) {
+    if (!s.images.length && !s.header) return pickBody(s, i);
     var slide = s.mode === 'slide';
     var out = '<div class="sec-opts"><div class="seg small" role="group" aria-label="보기 방식">' +
       '<button type="button" data-act="sec-mode" data-v="stack" data-sec="' + i + '"' + (slide ? '' : ' class="is-on"') + '>세로로 쌓기</button>' +
@@ -2029,10 +2097,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }
       var onPg = state.editing !== 'main';
       var cOnly = !onPg && whereOf(s) === 'contact';
-      var num = cOnly ? '방' : s.nav && filled(s) ? pad2(++no) : '–';
+      var num = cOnly ? '방' : s.nav ? pad2(++no) : '–', pend = s.nav && !cOnly && !filled(s);
       return '<div class="sec' + (cOnly ? ' is-contact' : '') + (s === curSec ? ' is-cur' : '') + '" data-drop="sec" data-sec="' + i + '"><div class="sec-head">' +
         '<span class="grip" draggable="true" data-drag="sec" data-sec="' + i + '" title="끌어서 순서 변경">⋮⋮</span>' +
-        '<span class="sec-no' + (num === '–' ? ' off' : '') + '" title="' + (cOnly ? '방문예약 페이지에만 나와요 (5번에서 변경)' : '메뉴 번호') + '">' + num + '</span>' +
+        '<span class="sec-no' + (num === '–' ? ' off' : '') + (pend ? ' is-pend' : '') + '" title="' + (cOnly ? '방문예약 페이지에만 나와요 (보이는 페이지에서 변경)' : pend ? '내용을 넣으면 이 번호로 메뉴에 나와요' : '메뉴 번호') + '">' + num + '</span>' +
         '<input class="inp" data-act="sec-label" data-sec="' + i + '" value="' + esc(s.label) + '" aria-label="메뉴 이름">' +
         '<label class="chk" title="' + (onPg ? '이 페이지 PC 오른쪽 메뉴에 나와요' : '메뉴에 나와요') + '"><input type="checkbox" data-act="sec-nav" data-sec="' + i + '"' + (s.nav ? ' checked' : '') + '>메뉴</label>' +
         '<button class="icon" type="button" data-act="sec-up" data-sec="' + i + '" title="위로">↑</button>' +
@@ -2042,7 +2110,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         '</div>' + (onPg ? '' : '<div class="sec-where"><span class="lab">보이는 페이지</span><div class="seg small" role="group" aria-label="보이는 페이지">' +
           WHERE.map(function (o) { return '<button type="button" data-act="sec-where" data-v="' + o[0] + '" data-sec="' + i + '"' + (whereOf(s) === o[0] ? ' class="is-on"' : '') + '>' + o[1] + '</button>'; }).join('') + '</div></div>') +
         '<div class="sec-body">' + (s.kind === 'video' ? videoBody(s, i) : s.kind === 'text' ? textBody(s, i) : sectionBody(s, i)) + '</div></div>';
-    }).join('') : '<div class="desc" style="margin:0">아직 섹션이 없어요. 1번에서 이미지를 올리면 자동으로 생겨요.</div>';
+    }).join('') : '<div class="desc" style="margin:0">아직 섹션이 없어요. 이미지를 올리면 자동으로 생겨요.</div>';
   }
   var WHERE = [['main', '메인만'], ['both', '둘 다'], ['contact', '방문예약만']];
   function renderContact() {
@@ -2108,8 +2176,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (s.kind !== 'images' || s.mode !== 'slide' || !s.images.length) return;
       if (!s.tabs) { add('ok', s.label + ': 슬라이드 ' + s.images.length + '장'); return; }
       var labels = s.images.map(function (im) { return (im.label || '').trim(); });
-      if (labels.some(function (l) { return !l; })) add('err', s.label + ': 탭 이름이 빈 칸이 있어요 (4번 섹션)');
-      else if (labels.some(function (l, k) { return labels.indexOf(l) !== k; })) add('err', s.label + ': 탭 이름이 겹쳐요 (4번 섹션)');
+      if (labels.some(function (l) { return !l; })) add('err', s.label + ': 탭 이름이 빈 칸이 있어요 (그 섹션을 눌러서 적어 주세요)');
+      else if (labels.some(function (l, k) { return labels.indexOf(l) !== k; })) add('err', s.label + ': 탭 이름이 겹쳐요 (그 섹션을 눌러서 고쳐 주세요)');
       else add('ok', s.label + ': 슬라이드 ' + s.images.length + '장 (' + labels.join(', ') + ')');
     });
     var nav = M.filter(function (s) { return s.nav && filled(s) && onPage(s, false); }).length;
@@ -2388,7 +2456,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var b = e.target.closest('[data-act]');
     if (!b || b.tagName === 'INPUT') return;
     var act = b.getAttribute('data-act'), si = +b.getAttribute('data-sec'), j = +b.getAttribute('data-idx'), s = state.sections[si];
-    if (/^lf-/.test(act)) return;   // 폼 추가 항목은 따로
+    if (/^lf-/.test(act) || act === 'sec-to') return;   // 폼 추가 항목·섹션 내용 고르기는 따로
     if (act === 'sec-where') s = MAIN()[si];   // 5번 칸은 늘 메인 원페이지 섹션
     switch (act) {
       case 'brand-chip': state.brand = b.getAttribute('data-hex'); state.brandTouched = true; renderBasics(); changed({ chips: true, fast: true }); return;
@@ -2442,13 +2510,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     changed({ sections: true, chips: true, fast: true });
   });
 
-  $('#f-mode').addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b) return;
-    state.siteMode = b.getAttribute('data-v');
+  function setMode(v) {
+    var was = state.siteMode;
+    state.siteMode = v;
     if (isMenuMode() && !(state.menus || []).length) starterMenus();
     if (!isMenuMode() && state.editing !== 'main') { editPage('main'); return; }
+    if (!isMenuMode() && pv.page !== 'main' && pv.page !== 'contact') pv.page = 'main';
     render();
-  });
+    if (v === 'menu' && was !== 'menu') setView('menus');   // 처음 켜면 메뉴 만드는 칸을 보여 줌
+  }
+  $('#f-mode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) setMode(b.getAttribute('data-v')); });
+  $('#tb-mode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) setMode(b.getAttribute('data-v')); });
   $('#menu-card').addEventListener('input', function (e) {
     var t = e.target; if (t.getAttribute('data-act') !== 'menu-name') return;
     var r = menuOf(t); r.it.name = t.value;
@@ -2597,7 +2669,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     return null;
   };
+  // 바탕화면 파일을 끌고 올 때 놓을 수 있는 칸 표시
+  var fileDrag = function (e) { return !drag && e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0; };
   panel.addEventListener('dragover', function (e) {
+    if (fileDrag(e)) {
+      var ft = e.target.closest && e.target.closest('[data-drop="header"], [data-drop="slot"], [data-drop="vfile"], [data-drop="layer"], .logo-box, [data-drop="img-end"], [data-drop="img"], .sec.is-cur .sec-body');
+      if (ft && ft.classList.contains('sec-body')) { var fs0 = state.sections[+ft.closest('.sec').getAttribute('data-sec')]; if (!fs0 || fs0.kind !== 'images') ft = null; }
+      $$('.is-drag-over').forEach(function (x) { if (x !== ft) x.classList.remove('is-drag-over'); });
+      if (ft) { e.preventDefault(); ft.classList.add('is-drag-over'); }
+      return;
+    }
     var t = dropTarget(e);
     if (!t) return;
     e.preventDefault();
@@ -2625,6 +2706,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         var lf = e.dataTransfer.files[0];
         state.heroLayers[+layEl.getAttribute('data-layer')].image = await loadImg(lf, lf.name);
         renderLayers(); changed({ fast: true });
+        return;
+      }
+      var secEl = e.target.closest && e.target.closest('[data-drop="img-end"], [data-drop="img"], .sec.is-cur .sec-body');
+      var secFor = secEl ? state.sections[+(secEl.getAttribute('data-sec') || (secEl.closest('.sec') || secEl).getAttribute('data-sec'))] : null;
+      if (secFor && secFor.kind === 'images' && !(e.target.closest('[data-drop="header"]'))) {
+        e.preventDefault();
+        $$('.is-drag-over').forEach(function (x) { x.classList.remove('is-drag-over'); });
+        await addFiles(e.dataTransfer.files, { sec: state.sections.indexOf(secFor) });
+        selectSec(secFor, false);
         return;
       }
       var hdrEl = e.target.closest && e.target.closest('[data-drop="header"]');
@@ -2769,7 +2859,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var m = new Map(), no = 0, onPg = list !== MAIN();
     list.forEach(function (x) {
       if (x.kind === 'form') { m.set(x, x.nav ? pad2(++no) : '–'); return; }
-      m.set(x, !onPg && whereOf(x) === 'contact' ? '방' : x.nav && filled(x) ? pad2(++no) : '–');
+      m.set(x, !onPg && whereOf(x) === 'contact' ? '방' : x.nav ? pad2(++no) : '–');
     });
     return m;
   }
@@ -2824,6 +2914,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     setView(pv.page === 'contact' ? 'contact' : view === 'contact' || view === 'upload' ? 'sections' : view);
   }
   $('#pg-tabs').addEventListener('click', function (e) {
+    var g = e.target.closest('[data-pg-group]');
+    if (g) { var p = $('#pg-pop'); if (!p.hidden && p.getAttribute('data-for') === g.getAttribute('data-pg-group')) closePgPop(); else { openPgPop(g); p.setAttribute('data-for', g.getAttribute('data-pg-group')); } return; }
     var b = e.target.closest('[data-pg]'); if (!b) return;
     var v = b.getAttribute('data-pg');
     if (v !== '+') { goPage(v); return; }
@@ -2831,6 +2923,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (isMenuMode()) $('#add-menu').click();
     else toast('메뉴 방식을 \'원페이지 + 메뉴 페이지\'로 바꾸면 페이지를 더할 수 있어요');
   });
+  $('#pg-pop').addEventListener('click', function (e) { var b = e.target.closest('[data-pg]'); if (!b) return; closePgPop(); goPage(b.getAttribute('data-pg')); });
+  document.addEventListener('mousedown', function (e) { if (!e.target.closest || !e.target.closest('#pg-pop, [data-pg-group]')) closePgPop(); });
+  window.addEventListener('resize', closePgPop);
+  $('#pg-tabs').addEventListener('scroll', closePgPop);
   $('#side-nav').addEventListener('click', function (e) {
     var b = e.target.closest('[data-view]'); if (!b) return;
     var v = b.getAttribute('data-view');
@@ -2859,7 +2955,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var w = onMain && x.kind !== 'form' ? whereOf(x) : '', wl = w === 'contact' ? ' · 방문예약만' : w === 'both' ? ' · 둘 다' : '';
     if (x.kind === 'images') {
       var n = x.images.length + (x.header ? 1 : 0);
-      return n ? n + '장' + (x.mode === 'slide' ? x.tabs ? ' · 탭 슬라이드' : ' · 슬라이드' : '') + wl : '<em>이미지를 넣어 주세요</em>';
+      return n ? n + '장' + (x.mode === 'slide' ? x.tabs ? ' · 탭 슬라이드' : ' · 슬라이드' : '') + wl : '<em>내용을 넣어 주세요</em>';
     }
     if (x.kind === 'video') return (filled(x) ? x.vsrc === 'file' ? '영상 파일' : '유튜브' : '<em>영상을 넣어 주세요</em>') + wl;
     if (x.kind === 'text') {
@@ -2889,7 +2985,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (isC && x.kind === 'form') return;
       var dim = isC && whereOf(x) === 'main', no = nums.get(x);
       rows.push('<div class="tr' + (x === curSec && view === 'sections' ? ' is-on' : '') + (dim ? ' is-dim' : '') + '" draggable="true" data-tr="sec" data-i="' + i + '">' +
-        '<span class="tr-no' + (no === '–' ? ' off' : '') + '">' + no + '</span>' + treeThumb(x) +
+        '<span class="tr-no' + (no === '–' ? ' off' : '') + (x.nav && x.kind !== 'form' && !filled(x) ? ' is-pend' : '') + '"' + (x.nav && x.kind !== 'form' && !filled(x) ? ' title="내용을 넣으면 이 번호로 메뉴에 나와요"' : '') + '>' + no + '</span>' + treeThumb(x) +
         '<span class="tr-t"><b>' + esc(x.label || (x.kind === 'form' ? '방문예약 폼' : '섹션')) + '</b><small>' + (dim ? '메인에만 나와요' : treeMeta(x, !onPg)) + '</small></span>' +
         '<button type="button" class="tr-eye' + (x.nav ? '' : ' off') + '" data-tr-act="nav" data-i="' + i + '" title="' + (x.nav ? '메뉴에 나와요 (누르면 빼기)' : '메뉴에 안 나와요 (누르면 넣기)') + '">' + (x.nav ? TI.eye : TI.eyeOff) + '</button></div>');
     });
@@ -2918,6 +3014,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   });
   tree.addEventListener('dragover', function (e) {
     var r = e.target.closest && e.target.closest('[data-tr="sec"]'); if (!r) return;
+    if (fileDrag(e) && trDrag == null) {
+      if (state.sections[+r.getAttribute('data-i')].kind !== 'images') return;
+      e.preventDefault();
+      $$('#tree .drop-into').forEach(function (x) { if (x !== r) x.classList.remove('drop-into'); });
+      r.classList.add('drop-into');
+      return;
+    }
     if (trDrag != null) {
       e.preventDefault();
       var bx = r.getBoundingClientRect(), after = e.clientY > bx.top + bx.height / 2;
@@ -2939,6 +3042,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     trClear();
     if (!r) { trDrag = null; return; }
     var L = state.sections, tgt = L[+r.getAttribute('data-i')];
+    if (trDrag == null && !drag && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      if (tgt.kind !== 'images') return;
+      e.preventDefault();
+      addFiles(e.dataTransfer.files, { sec: L.indexOf(tgt) }).then(function () { selectSec(tgt, true); });
+      return;
+    }
     if (trDrag != null) {
       e.preventDefault();
       var mv = L[trDrag]; trDrag = null;
@@ -2972,7 +3081,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     e.preventDefault();
     setZoom(curScale() * Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
   }, { passive: false });
-  var panSet = function (on) { panOn = on; panLayer.hidden = !on; if (!on) { panFrom = null; panLayer.classList.remove('is-grab'); } };
+  var panSet = function (on) { panOn = on; panLayer.hidden = !on; if (on) hintDone(); if (!on) { panFrom = null; panLayer.classList.remove('is-grab'); } };
   panLayer.addEventListener('mousedown', function (e) { panFrom = { x: e.clientX, y: e.clientY, l: stage.scrollLeft, t: stage.scrollTop }; panLayer.classList.add('is-grab'); e.preventDefault(); });
   window.addEventListener('mousemove', function (e) { if (!panFrom) return; stage.scrollLeft = panFrom.l - (e.clientX - panFrom.x); stage.scrollTop = panFrom.t - (e.clientY - panFrom.y); });
   window.addEventListener('mouseup', function () { if (panFrom) { panFrom = null; panLayer.classList.remove('is-grab'); } });
@@ -2996,6 +3105,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (mod && (c === 'Digit0' || c === 'Numpad0')) { e.preventDefault(); setZoom(1); return true; }
     if (!mod && e.shiftKey && c === 'Digit1') { e.preventDefault(); zoomFit(); return true; }
     if (!mod && c === 'Delete' && view === 'sections' && curSecIn()) { e.preventDefault(); secAct('del', curSec); return true; }
+    if (c === 'Escape' && !$('#pg-pop').hidden) { closePgPop(); return true; }
     if (c === 'Escape' && curSec) { curSec = null; renderSections(); renderTree(); postMark(false); return true; }
     return false;
   }
@@ -3037,6 +3147,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       '<label class="chk lf-hide"><input type="checkbox" data-act="lf-hidememo" data-sec="' + i + '"' + (x.hideMemo ? ' checked' : '') + '>리드요 \'문의 내용\' 칸은 숨기기 (추가 항목 답만 받기)</label>' +
       (k === 0 ? '<p class="note">방문예약 페이지·메뉴 페이지 폼에도 이 첫 번째 폼의 추가 항목이 들어가요.</p>' : '');
   }
+  // 빈 섹션을 글·영상 섹션으로 바꾸기 (이름을 바꿔 뒀으면 그 이름 그대로)
+  function secTo(x, kind) {
+    var L = state.sections, i = L.indexOf(x);
+    if (i < 0) return;
+    var o = x.label && x.label !== '새 섹션' ? { label: x.label } : {};
+    var nx = kind === 'text' ? textSection(o) : videoSection(o);
+    if (x.where) nx.where = x.where;
+    L.splice(i, 1, nx);
+    changed({ sections: true, contact: true });
+    selectSec(nx, true);
+    var foc = $(kind === 'text' ? '#secs .sec.is-cur textarea' : '#secs .sec.is-cur [data-act="vid-url"]'); if (foc) foc.focus();
+  }
   var lfOf = function (t) { var x = state.sections[+t.getAttribute('data-sec')]; return { s: x, f: x && x.fields ? x.fields[+t.getAttribute('data-idx')] : null }; };
   panel.addEventListener('input', function (e) {
     var t = e.target, act = t.getAttribute('data-act'); if (!act || !/^lf-/.test(act)) return;
@@ -3060,7 +3182,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   });
   panel.addEventListener('click', function (e) {
     var b = e.target.closest('[data-act]'); if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
-    var act = b.getAttribute('data-act'); if (!/^lf-/.test(act)) return;
+    var act = b.getAttribute('data-act');
+    if (act === 'sec-to') { secTo(state.sections[+b.getAttribute('data-sec')], b.getAttribute('data-v')); return; }
+    if (!/^lf-/.test(act)) return;
     var r = lfOf(b), x = r.s, j = +b.getAttribute('data-idx');
     if (!x) return;
     if (act === 'lf-add') {
