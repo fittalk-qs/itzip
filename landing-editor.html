@@ -4702,7 +4702,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           how = '모바일 이미지 파일명 규칙: ' + pat.name;
         } else how = '모바일용 이미지를 따로 못 찾았어요 (휴대폰에서도 PC 이미지를 써요)';
       }
-      lastScan = { site: m.site, menus: m.menus, pages: f.pages, how: how, skipped: m.skipped };
+      lastScan = { site: m.site, menus: m.menus, pages: f.pages, how: how, skipped: m.skipped, data: m.data || [] };   // data = 사이트 스크립트가 부르는 JSON (평면 데이터 등)
       scanNote('');
       openScan(lastScan);
     } catch (err) {
@@ -6924,6 +6924,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var blob = await r.blob(), n = name || '';
     if (!n) { try { n = decodeURIComponent(new URL(u).pathname.split('/').pop()); } catch (e) { n = 'image'; } }
+    if (/svg/.test(blob.type) || /\.svg$/i.test(n)) { blob = await svgPng(blob); n = n.replace(/\.svg$/i, '') + '.png'; }   // SVG 로고 → PNG
     if (!/\.(png|jpe?g|webp|gif)$/i.test(n)) n = (n.replace(/\.[^.]*$/, '') || 'image') + (/png/.test(blob.type) ? '.png' : /webp/.test(blob.type) ? '.webp' : '.jpg');
     return loadImg(blob, n);
   }
@@ -6954,6 +6955,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   // 덮어 자르기 (히어로): 남는 쪽에서 그림 내용(경계)이 가장 많은 창을 고름 — 휴대폰용 첫 화면 사진은 하늘이 길고 건물이 아래에 있음
+  async function detailOf(im) {   // 그림 내용(경계) 세기: 64 폭으로 줄여 이웃 픽셀 차이 평균
+    try {
+      var bmp = await createImageBitmap(im.blob), w = 64, h = Math.max(2, Math.round(bmp.height * 64 / bmp.width)), c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(bmp, 0, 0, w, h); bmp.close();
+      var d = x.getImageData(0, 0, w, h).data, e = 0;
+      for (var yy = 1; yy < h; yy++) for (var xx = 1; xx < w; xx++) { var k = (yy * w + xx) * 4; e += Math.abs(d[k] - d[k - 4]) + Math.abs(d[k + 1] - d[k - 3]) + Math.abs(d[k] - d[k - w * 4]); }
+      return e / (w * h);
+    } catch (err) { return 0; }
+  }
   async function coverCropSmart(im, W, H, q) {
     var bmp = await createImageBitmap(im.blob), sc = Math.max(W / bmp.width, H / bmp.height), sw = W / sc, sh = H / sc, sx = (bmp.width - sw) / 2, sy = (bmp.height - sh) / 2;
     if (bmp.height - sh > 8) {
@@ -6964,6 +6974,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       var win = Math.max(1, Math.round(sh * ah / bmp.height)), best = -1, bestY = 0, sum = 0;
       for (y = 0; y < ah; y++) { sum += rowE[y]; if (y >= win) sum -= rowE[y - win]; if (y >= win - 1 && sum >= best) { best = sum; bestY = y - win + 1; } }
       sy = Math.min(bmp.height - sh, Math.max(0, bestY * bmp.height / ah));
+    }
+    if (bmp.width - sw > 8) {   // 가로로 남음: 열마다 내용 세기 → 가장 많은 창 (가로 사진의 건물 쪽)
+      var bw2 = 120, bh2 = Math.max(2, Math.round(bmp.height * bw2 / bmp.width)), b2 = canvas(bw2, bh2), bc2 = b2.getContext('2d', { willReadFrequently: true });
+      bc2.drawImage(bmp, 0, 0, bw2, bh2);
+      var d2 = bc2.getImageData(0, 0, bw2, bh2).data, colE = new Float32Array(bw2);
+      for (var y2 = 1; y2 < bh2; y2++) for (var x2 = 1; x2 < bw2; x2++) { var k2 = (y2 * bw2 + x2) * 4; colE[x2] += Math.abs(d2[k2] - d2[k2 - 4]) + Math.abs(d2[k2 + 1] - d2[k2 - 3]) + Math.abs(d2[k2] - d2[k2 - bw2 * 4]); }
+      var win2 = Math.max(1, Math.round(sw * bw2 / bmp.width)), best2 = -1, bx2 = 0, sum2 = 0;
+      for (x2 = 0; x2 < bw2; x2++) { sum2 += colE[x2]; if (x2 >= win2) sum2 -= colE[x2 - win2]; if (x2 >= win2 - 1 && sum2 > best2) { best2 = sum2; bx2 = x2 - win2 + 1; } }
+      sx = Math.min(bmp.width - sw, Math.max(0, bx2 * bmp.width / bw2));
     }
     var c = canvas(W, H), cx = c.getContext('2d');
     cx.imageSmoothingQuality = 'high'; cx.drawImage(bmp, sx, sy, sw, sh, 0, 0, W, H); bmp.close();
@@ -7063,11 +7082,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
   function summaryRows(items) {
     var xs = (items || []).filter(function (x) { return x.t === 'x'; }), pairs = [], blocks = [];
-    var isLab = function (v) { var k = v.replace(/\s/g, ''); return k.length <= 10 && !/\d/.test(k) && /면적|규모|세대|건폐|용적|위치|주차|용도|시행|시공|입주|대지|층수|동수|구조/.test(k); };
+    var isLab = function (v) { var k = v.replace(/\s/g, ''); return k.length <= 10 && !/\d/.test(k) && /면적|규모|세대|건폐|용적|위치|주차|용도|시행|시공|입주|대지|층수|동수|구조|주택형|타입|평형|공급/.test(k); };
     for (var k = 0; k < xs.length; k++) {
       var v = oneLine(xs[k].v);
       if (/^[A-Z]?\d*[-\s]?\d*\s*(블록|BL|단지)$/i.test(v.replace(/\s/g, '')) && v.length <= 12) { blocks.push(v); continue; }
-      if (isLab(v) && xs[k + 1] && !isLab(oneLine(xs[k + 1].v)) && /\d/.test(xs[k + 1].v)) { pairs.push([v, oneLine(xs[k + 1].v)]); k++; }
+      if (isLab(v) && xs[k + 1] && !isLab(oneLine(xs[k + 1].v)) && /\d/.test(xs[k + 1].v)) {
+        var val = String(xs[k + 1].v).replace(/\|\s*([^|\n]+?)\s*\|\s*/g, '$1 : ').split(/\s*\n\s*|\s+\/\s+(?=[가-힣A-Za-z]+\s*:)/).map(function (t) { return t.replace(/\s+/g, ' ').trim(); }).filter(Boolean).join('\n');   // '| 공동주택 | 총 … / | 오피스텔 | …' → 줄마다 '공동주택 : …'
+        pairs.push([v, val]); k++;
+      }
     }
     var order = [], by = {};
     pairs.forEach(function (p) { if (!by[p[0]]) { by[p[0]] = []; order.push(p[0]); } by[p[0]].push(p[1]); });
@@ -7078,9 +7100,34 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       return [lab, uniq.join('\n'), 100];
     }).slice(0, 8);
   }
+  // 커뮤니티 페이지 글 → 구역: 'B1F/B2F - SPORTS ZONE' 같은 줄 = 구역 이름, 시설 목록 앞 그림 = 도면, 뒤 그림 + 짧은 글 = 사진 + 설명, [짧은 굵은 이름 → 설명] = 시설
+  function commFromFlow(flow) {
+    var zones = [], cur = null, xs = (flow || []).filter(function (x) { return x.t !== 's'; });
+    var junk = /크게\s*보기|이미지\s*컷|^scroll$|^\d+\s*\/\s*\d+$|^(master\s*plan|summary)$/i;
+    var isZone = function (v) { v = oneLine(v); return v.length <= 40 && (/zone/i.test(v) || /^B?\d+\s*F\b/i.test(v)); };
+    var newZ = function (head) { cur = { head: head, plans: [], photos: [], list: [] }; zones.push(cur); };
+    for (var k = 0; k < xs.length; k++) {
+      var x = xs[k];
+      if (x.t === 'x') {
+        var v = oneLine(x.v);
+        if (!v || junk.test(v) || /^[※*]/.test(v)) continue;
+        if (isZone(v)) { newZ(v.replace(/\s*-\s*/, ' | ')); continue; }
+        var nx = xs[k + 1];
+        if (cur && v.length <= 16 && (/^h[3-6]$|^strong$|^b$|^dt$/.test(x.g) || x.h) && nx && nx.t === 'x' && oneLine(nx.v).length >= 8 && !isZone(nx.v)) { cur.list.push({ head: v, desc: oneLine(nx.v) }); k++; }
+        continue;
+      }
+      if (x.t === 'i' && !x.bg) {
+        if (!cur) newZ('');
+        var nv = xs[k + 1] && xs[k + 1].t === 'x' ? oneLine(xs[k + 1].v) : '', headish = xs[k + 1] && (/^h[3-6]$|^strong$|^b$|^dt$/.test(xs[k + 1].g) || xs[k + 1].h), cap = nv && nv.length <= 20 && !isZone(nv) && !junk.test(nv) && !(headish && xs[k + 2] && xs[k + 2].t === 'x' && oneLine(xs[k + 2].v).length >= 8) ? nv : '';
+        if (!cur.list.length && !cap) cur.plans.push(x.v);
+        else { cur.photos.push({ u: x.v, cap: cap }); if (cap) k++; }
+      }
+    }
+    return zones.filter(function (z) { return z.plans.length || z.photos.length || z.list.length; });
+  }
   // 평면 페이지 하나에 타입이 탭으로 여럿 (84A · 84B …): 탭 이름 줄 다음에 나오는 그림을 차례로 짝지음
-  function typesFromTabs(flow) {
-    var isT = function (v) { v = oneLine(v); return v.length <= 12 && /^\d{2,3}(\.\d+)?\s*[A-Za-z]{0,3}\d?([,\s]+[A-Za-z]{1,3})*(\s*(타입|형|type))?$/i.test(v) && !/㎡|m2|~/.test(v); };
+  function typesFromTabs(flow, area) {
+    var isT = function (v) { v = oneLine(v); return v.length <= 12 && (area ? /^\d{2,3}(\.\d+)?\s*(㎡|m2|m²)?\s*[A-Za-z]{0,3}\d?(\s*(타입|형|type))?$/i.test(v) : /^\d{2,3}(\.\d+)?\s*[A-Za-z]{0,3}\d?([,\s]+[A-Za-z]{1,3})*(\s*(타입|형|type))?$/i.test(v) && !/㎡|m2|~/.test(v)); };
     var q = [], out = [];
     (flow || []).forEach(function (x) {
       if (x.t === 'x' && isT(x.v)) { q.push(oneLine(x.v).replace(/\s*(타입|type)$/i, '')); return; }
@@ -7376,6 +7423,78 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     });
     return { list: out.filter(function (e) { return e.head.replace(/\s/g, '').length >= 2; }), notes: notes };
   }
+  async function communityFromZones(zones, y0, prog) {
+    var L = [], y = y0, get = async function (u) { try { return await urlIm(u); } catch (e) { return null; } };
+    for (var zi = 0; zi < zones.length; zi++) {
+      var z = zones[zi];
+      if (prog) prog(zi, zones.length);
+      if (z.head) { L.push(lr(0, y, 860, 92, '#e8e8e8', 0, '구역 띠'), Object.assign(lt({ text: z.head, x: 40, y: y + 27, w: 780, weight: 700, size: 30, lh: 1.25, color: '#1b1b1b', align: 'center' }), { name: '구역 이름' })); y += 92 + 50; }
+      for (var pi = 0; pi < z.plans.length; pi++) { var pim = await get(z.plans[pi]); if (!pim) continue; var ph = Math.round(800 * pim.h / pim.w); L.push(li(pim, 30, y, 800, 0, 0, '도면')); y += ph + 40; }
+      var tiles = [];
+      for (var ti = 0; ti < z.photos.length && tiles.length < 6; ti++) { var tim = await get(z.photos[ti].u); if (tim) tiles.push({ im: tim, cap: z.photos[ti].cap }); }
+      if (tiles.length) {
+        var cols = tiles.length === 3 ? 3 : tiles.length === 1 ? 1 : 2, gap = 10, tw = Math.floor((800 - gap * (cols - 1)) / cols), ar = Math.min(0.75, tiles[0].im.h / tiles[0].im.w);
+        tiles.forEach(function (tl, k) {
+          var col = k % cols, tx = 30 + col * (tw + gap), th = Math.round(tw * (cols === 1 ? tl.im.h / tl.im.w : ar));
+          L.push(li(tl.im, tx, y, tw, th, 0, '사진'));
+          if (tl.cap) L.push(lr(tx, y + th, tw, 56, '#eeeeee', 0, '사진 설명 띠'), Object.assign(lt({ text: tl.cap, x: tx + 8, y: y + th + 14, w: tw - 16, size: 26, lh: 1.1, color: '#555555', align: 'center' }), { name: '사진 설명' }));
+          if (col === cols - 1 || k === tiles.length - 1) y += th + (tiles.some(function (q) { return q.cap; }) ? 56 : 0) + 20;
+        });
+        y += 30;
+      }
+      if (z.list.length) {
+        y += 10;
+        for (var ei = 0; ei < z.list.length; ei++) {
+          var en = z.list[ei], dn = en.desc ? lineCount(en.desc, 'pretendard', 400, 26, 658, -0.02) : 0, rh = Math.max(82, 42 + 38 * dn), icn = commIcon(en.head + ' ' + en.desc);
+          L.push(lr(45, y, 82, 82, 'brand', 41, en.head + ' 아이콘 바탕'));
+          var icim = await iconIm(icn, '#ffffff', 42);
+          if (icim) L.push(Object.assign(li(icim, 65, y + 20, 42, 42, 0, en.head + ' 아이콘'), { icon: icn, iconColor: '#ffffff' }));
+          L.push(lt({ text: en.head, x: 157, y: y, w: 658, weight: 700, size: 30, lh: 38 / 30, color: 'brand' }));
+          if (en.desc) L.push(lt({ text: en.desc, x: 157, y: y + 42, w: 658, size: 26, lh: 38 / 26, ls: -0.02, color: 'brand' }));
+          y += rh + 40;
+        }
+      }
+      y += 60;
+    }
+    return { layers: L, h: y - y0 - 60 };
+  }
+  // 평면 내용 그림(평면도 + 특화 설명이 세로로 긴 것) → 첫 평면도만
+  async function planCrop(im) {
+    try {
+      var bmp = await createImageBitmap(im.blob), A = Math.min(520, bmp.width), H = Math.round(bmp.height * A / bmp.width);
+      if (H < A * 1.4) { bmp.close(); return im; }
+      var c = canvas(A, H), x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(bmp, 0, 0, A, H);
+      var zp = zonePlan(x.getImageData(0, 0, A, H).data, A, H), its = [];
+      zp.zones.forEach(function (z) { its = its.concat(z.items); });
+      var it = its.find(function (q) { return (q.kind === 'plan' || q.kind === 'photo') && q.box.h > A * 0.25; });
+      if (!it) { bmp.close(); return im; }
+      var part = (it.parts && it.parts.length ? it.parts : [it.box]).slice().sort(function (a, b) { return b.w * b.h - a.w * a.h; })[0];
+      var rr = bmp.width / A, pad = 8, sx = Math.max(0, Math.round(part.x * rr) - pad), sy = Math.max(0, Math.round(it.box.y * rr) - pad), sw = Math.min(bmp.width - sx, Math.round(part.w * rr) + pad * 2), sh = Math.min(bmp.height - sy, Math.round(it.box.h * rr) + pad * 2);
+      var cc = canvas(sw, sh); cc.getContext('2d').drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh); bmp.close();
+      return loadImg(await toBlob(cc, 'image/png'), im.name.replace(/\.[a-z0-9]+$/i, '') + '_plan.png');
+    } catch (e) { return im; }
+  }
+  // SVG(로고 등) → PNG (가로 800)
+  async function svgPng(blob) {
+    var txt = await blob.text(), vb = /viewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(txt);
+    var wm = /<svg[^>]*?\swidth\s*=\s*["']?([\d.]+)(px)?["'\s>]/i.exec(txt), hm = /<svg[^>]*?\sheight\s*=\s*["']?([\d.]+)(px)?["'\s>]/i.exec(txt);
+    var w0 = wm && hm ? +wm[1] : vb ? +vb[1] : 300, h0 = wm && hm ? +hm[1] : vb ? +vb[2] : 150;
+    if (!(wm && hm)) txt = txt.replace(/<svg\b/i, '<svg width="' + w0 + '" height="' + h0 + '"');
+    var img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(txt); await img.decode();
+    var W = 800, H = Math.max(1, Math.round(W * h0 / w0)), c = canvas(W, H); c.getContext('2d').drawImage(img, 0, 0, W, H);
+    return toBlob(c, 'image/png');
+  }
+  // 흰 글씨 로고(어두운 바탕용)인지: 보이는 픽셀이 거의 다 흰색
+  async function whiteish(im) {
+    try {
+      var bmp = await createImageBitmap(im.blob), c = canvas(48, 24), x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(bmp, 0, 0, 48, 24); bmp.close();
+      var d = x.getImageData(0, 0, 48, 24).data, sum = 0, n = 0;
+      for (var i = 0; i < d.length; i += 4) if (d[i + 3] > 100) { sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; n++; }
+      return n > 10 && sum / n > 225;
+    } catch (e) { return false; }
+  }
   async function communityZones(im, y0, prog) {
     var bmp = await createImageBitmap(im.blob), A = Math.min(520, bmp.width), H = Math.round(bmp.height * A / bmp.width), c = canvas(A, H), x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(bmp, 0, 0, A, H);
@@ -7542,7 +7661,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var home = null, noText = '';
     try { home = await scanCall({ op: 'text', url: d.site.url }); }
     catch (e) { noText = /모르는 요청/.test(e.message || '') ? '중계 서버가 예전 코드라 글자는 못 읽었어요 (Cloudflare 중계 서버에 새 worker.js 를 붙여 넣으면 글자까지 읽어요). 지금은 이미지로만 만들어요' : '메인 화면 글자를 못 읽었어요 (' + (e.message || e) + '). 이미지로만 만들어요'; }
-    var typeRows = pagesBy(d, /^\s*\d{2,3}\s*[A-Za-z]{0,3}\d?\s*(타입|type)?\s*$|타입|평면/i, /(^|[\/_\-.])(unit|type)/i, /마감|e모델|모델하우스|vr|커뮤니티|community/i);
+    var typeRows = pagesBy(d, /^\s*\d{2,3}\s*[A-Za-z]{0,3}\d?\s*(타입|type)?\s*$|타입|평면/i, /(^|[\/_\-.])(unit|type)/i, /마감|e모델|모델하우스|vr|커뮤니티|community|동\s*호수|호수표|배치/i);
     var isOt = function (x) { return /오피스텔|officetel/i.test(x.item.name + ' ' + (x.parent ? x.parent.name : '')) || /_ot\b|officetel/i.test(x.item.url); };
     if (typeRows.some(function (x) { return !isOt(x); })) typeRows = typeRows.filter(function (x) { return !isOt(x); });
     var types = [];
@@ -7555,10 +7674,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       var nm = (/(\d{2,3}\s*[A-Za-z]{0,3}\d?)/.exec(x.item.name) || /(\d{2,3}[A-Za-z]{0,3}\d?)(?=\.html?$|$)/i.exec(x.item.url.replace(/^.*[\/_]/, '')) || [])[1] || x.item.name;
       types.push(Object.assign(typeInfo(f && f.flow, nm.replace(/\s+/g, '').toUpperCase()), { imgs: x.P.pc.slice(0, 4), flow: f && f.flow }));
     }
+    if (types.length < 2 && (d.data || []).length) {   // 평면 페이지가 스크립트로 그려져서 그림이 없음 → 사이트가 부르는 평면 데이터 JSON (getCyber.json 등)
+      var uj = d.data.filter(function (u) { var n = u.split('/').pop(); return /cyber|unit|type|plan|house|floor/i.test(n) && !/menu|gnb|nav/i.test(n); });
+      for (var ui = 0; ui < uj.length && types.length < 2; ui++) {
+        prog('평면 데이터 읽는 중', 88);
+        var ur = await scanCall({ op: 'units', url: uj[ui], ref: d.site.url }).catch(function () { return null; });
+        if (ur && ur.types && ur.types.length >= 2) types = ur.types.map(function (t) { return { name: t.name, units: t.units, areas: t.areas, imgs: t.imgs.slice(0, 1), flow: null, json: true }; });
+      }
+    }
     var P = { home: home, noText: noText, types: types };
     var irow = pagesBy(d, /e\s*모델|모델\s*하우스|인테리어|유니트\s*(갤러리|vr)|interior|gallery/i, /(^|[\/_\-])(vr|interior|gallery|model)/i, /커뮤니티|community|오피스텔|officetel|_ot\b|c_vr/i)[0];
     if (irow) {   // 탭 이름(102C …) 다음 사진을 짝지음. 탭이 없으면 사진만
-      var fi = home ? await scanCall({ op: 'text', url: irow.item.url }).catch(function () { return null; }) : null, itb = fi ? typesFromTabs(fi.flow) : [];
+      var fi = home ? await scanCall({ op: 'text', url: irow.item.url }).catch(function () { return null; }) : null, itb = fi ? typesFromTabs(fi.flow, true) : [];
       P.interior = (itb.length ? itb : irow.P.pc.map(function (u) { return { name: '', img: u }; })).slice(0, 6);
     }
     var secs = flowSecs(home && home.flow), h0 = secs.find(function (s) { return /[가-힣]{2}/.test(s.text); }) || secs[0];
@@ -7574,6 +7701,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       scanRows(d).forEach(function (x) { x.P.pc.forEach(function (u) { if (allIm.indexOf(u) < 0) allIm.push(u); }); });
       var hm = allIm.find(function (u) { var n = u.split(/[?#]/)[0].split('/').pop(); return /main[_-]?(bg|visual|img)|visual[_-]?bg|^(main|hero|kv|mv|visual)[_-]?d*.(jpe?g|png|webp)$/i.test(n) && !/txt|text|title|logo|btn|icon/i.test(n); });
       if (hm) { P.heroMo = P.heroPc = hm; P.heroGuess = true; }
+    }
+    if (!P.heroMo || P.heroGuess) {   // 첫 화면이 동영상: 대표 그림(poster)
+      var posters = (home && home.flow || []).filter(function (x) { return x.t === 'i' && x.poster; }).map(function (x) { return x.v; });
+      var pst = posters.find(function (u) { return !/intro|logo|thumb/i.test(u.split('/').pop()); }) || posters[0];
+      if (pst) { P.heroMo = P.heroPc = pst; P.heroGuess = false; P.heroPoster = true; P.heroPosters = posters.slice(0, 4); }
     }
     if (h0) {
       var site = normK(d.site.title), lines = [];
@@ -7630,6 +7762,37 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       P.site = { pc: sp.filter(function (u, i) { return sp.indexOf(u) === i; }), mo: [] }; P.pos = pp.length ? { pc: pp, mo: [] } : null;
     }
     P.event = first(/이벤트|event/i, /event/i);
+    // 하위 페이지 글 (첫 화면에 없을 때): 프리미엄·사업개요·입지·커뮤니티 페이지를 글자로 읽음
+    var pageAny = function (re, urlRe, not) { return scanRows(d).find(function (x) { return (re.test(x.item.name) || (urlRe && urlRe.test(x.item.url))) && !(not && (not.test(x.item.name) || not.test(x.item.url))); }) || null; };
+    var pageText = async function (row) { return row && home ? await scanCall({ op: 'text', url: row.item.url }).catch(function () { return null; }) : null; };
+    var SUBJUNK = /크게\s*보기|이미지\s*컷|^scroll$|^(summary|master\s*plan|unit\s*plan|sales|media|location)$/i;
+    var subItems = function (f) { return (f && f.flow || []).filter(function (x) { return !(x.t === 'x' && (SUBJUNK.test(oneLine(x.v)) || /^[※*]/.test(oneLine(x.v)))); }); };
+    if (P.premium.length < 2) {
+      prog('프리미엄 페이지 읽는 중', 92);
+      var pf = await pageText(pageAny(/프리미엄|premium/i, /premium/i, /브랜드|brand/i)), pit = subItems(pf), pp2 = premiumItems(pit);
+      if (pp2.length < 2) pp2 = premiumPairs(pit, d.site.title);
+      if (pp2.length >= 2) {
+        pp2.forEach(function (it) { var k = pit.findIndex(function (x) { return x.t === 'x' && oneLine(x.v) === it.head; }); for (var q = k - 1; q >= 0 && q >= k - 4; q--) if (pit[q].t === 'i' && !pit[q].bg) { it.img = pit[q].v; break; } });
+        P.premium = pp2;
+      }
+    }
+    if (!P.sumRows.length) {
+      prog('사업개요 페이지 읽는 중', 94);
+      var sfp = await pageText(pageAny(/사업\s*개요|개요|overview|summary/i, /overview|summary|planning|outline/i, /브랜드|brand/i));
+      var sr2 = sfp ? summaryRows(subItems(sfp)) : [];
+      if (sr2.length >= 2) P.sumRows = sr2;
+    }
+    if (!ls || !/location|입지/i.test(ls.text)) {
+      var lfp = await pageText(pageAny(/입지|location/i, /location/i, /오시는|contact/i));
+      var lc = lfp ? copyOf(subItems(lfp).filter(function (x) { return x.t !== 'x' || oneLine(x.v).length > 6; })) : null;
+      if (lc && lc.head && /[가-힣]/.test(lc.head)) P.locCopy = lc;
+    }
+    var cpg = pageAny(/커뮤니티|community/i, /commun/i);
+    if (cpg) {
+      prog('커뮤니티 페이지 읽는 중', 96);
+      var cfp = await pageText(cpg), cz2 = cfp ? commFromFlow(cfp.flow) : [];
+      if (cz2.reduce(function (n, z) { return n + z.list.length; }, 0) >= 3) P.commZones = cz2;
+    }
     // 메인 색: 스타일에서 많이 쓴 색 중 채도 있고 너무 밝지·어둡지 않은 것
     P.brand = '';
     (home && home.colors || []).some(function (c) { var hsl = rgbHsl(hexRgb(c[0])), l = lum(c[0]); if (hsl[1] >= 0.25 && l >= 25 && l <= 170) { P.brand = c[0]; return true; } return false; });
@@ -7639,10 +7802,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
   var AUTO_ROWS = [
     ['interior', '인테리어', function (P) { return P.interior && P.interior.length ? '사진 ' + P.interior.length + '장' + (P.interior[0].name ? ' (' + P.interior.map(function (x) { return x.name; }).join(' · ') + ')' : '') + ' · 홈페이지 E모델하우스' : ''; }],
-    ['hero', '히어로', function (P) { return (P.heroMo ? (P.heroGuess ? '파일 이름으로 찾은 첫 화면 사진' : '첫 화면 배경 사진') : '사진을 못 찾아서 메인 색 바탕으로 (나중에 사진만 바꾸면 돼요)') + (P.heroSub ? ' + 문구 “' + P.heroSub + '”' : ''); }],
+    ['hero', '히어로', function (P) { return (P.heroMo ? (P.heroGuess ? '파일 이름으로 찾은 첫 화면 사진' : P.heroPoster ? '첫 화면 동영상의 대표 그림' : '첫 화면 배경 사진') : '사진을 못 찾아서 메인 색 바탕으로 (나중에 사진만 바꾸면 돼요)') + (P.heroSub ? ' + 문구 “' + P.heroSub + '”' : ''); }],
     ['premium', '프리미엄', function (P) { return P.premium.length >= 2 ? P.premium.length + '개 (' + P.premium.map(function (x) { return x.head; }).join(' · ') + ')' : '우리 템플릿으로 (' + (P.prem ? '홈페이지 프리미엄 그림의 글자를 읽어서' : '글은 비워 둔 칸 4개') + ')'; }],
     ['location', '입지환경', function (P) { return P.loc || P.locCopy ? (P.locCopy ? '문구 “' + oneLine(P.locCopy.head) + '”' : '') + (P.loc ? (P.locCopy ? ' + ' : '') + '지도' : '') : ''; }],
-    ['community', '커뮤니티', function (P) { return P.commCards && P.commCards.length ? '시설 ' + P.commCards.length + '개 (' + P.commCards.map(function (x) { return x.head; }).join(' · ') + ')' + (P.comm ? ' + 도면 (휴대폰용으로 다시 짜기)' : '') : P.comm ? '커뮤니티 도면 (휴대폰용으로 다시 짜기)' : ''; }],
+    ['community', '커뮤니티', function (P) { if (P.commZones) return '구역 ' + P.commZones.length + '개 · 시설 ' + P.commZones.reduce(function (n, z) { return n + z.list.length; }, 0) + '개 (홈페이지 글 그대로 · 도면 · 사진)'; return P.commCards && P.commCards.length ? '시설 ' + P.commCards.length + '개 (' + P.commCards.map(function (x) { return x.head; }).join(' · ') + ')' + (P.comm ? ' + 도면 (휴대폰용으로 다시 짜기)' : '') : P.comm ? '커뮤니티 도면 (휴대폰용으로 다시 짜기)' : ''; }],
     ['siteplan', '단지배치', function (P) { return P.site ? '배치도 ' + P.site.pc.length + '장' + (P.pos ? ' + 동호수 배치도' : '') + ' (휴대폰용으로 다시 짜기)' : ''; }],
     ['types', '타입안내', function (P) { return P.types.length ? P.types.length + '개 타입 슬라이드 (' + P.types.map(function (t) { return t.name; }).join(' · ') + ')' : ''; }],
     ['summary', '사업개요', function (P) { return P.sumRows && P.sumRows.length >= 3 ? P.sumRows.length + '줄 (' + P.sumRows.map(function (r) { return r[0]; }).join(' · ') + ')' : P.sum || P.facts.length ? (P.sum ? '표 글자를 읽어서 정리 (처음 한 번 글자 읽기 도구를 받아요)' : '세대수·위치') : ''; }]
@@ -7685,6 +7848,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (P.logos.length) {
       prog('로고', 5);
       var lgs = (await Promise.all(P.logos.map(function (u) { return safe(u); }))).filter(function (im) { return im && im.w >= 40; });
+      var lgw = []; for (var lq = 0; lq < lgs.length; lq++) if (!(await whiteish(lgs[lq])) && !/white|_wh\b/i.test(lgs[lq].name)) lgw.push(lgs[lq]);
+      if (lgw.length) lgs = lgw;
       var lg = lgs.filter(function (im) { return im.w / im.h >= 2.5; }).sort(function (a, b) { return b.w * b.h - a.w * a.h; })[0] || lgs[0];
       if (lg) { setLogo(await processLogo(lg.blob, lg.name)); made.push('로고'); }
     }
@@ -7692,7 +7857,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var hero = null;
     if (on('hero') && P.heroMo) {
       prog('히어로 사진', 8);
-      var src = await safe(P.heroMo);
+      var src = null;
+      if (P.heroPosters && P.heroPosters.length > 1) {   // 동영상 대표 그림 여럿: 작은 임시 그림·안개 같은 그림 말고 내용 많은 큰 그림
+        var pcs = (await Promise.all(P.heroPosters.map(function (u) { return urlIm(u).catch(function () { return null; }); }))).filter(function (im) { return im && im.w >= 800; }), bestE = -1;
+        for (var pci = 0; pci < pcs.length; pci++) { var e = await detailOf(pcs[pci]); if (e > bestE) { bestE = e; src = pcs[pci]; } }
+      }
+      if (!src) src = await safe(P.heroMo);
       if (src) hero = { bg: await coverCropSmart(src, 860, 1366, 0.9), pc: P.heroPc && P.heroPc !== P.heroMo ? await safe(P.heroPc) : null };
     }
     if (on('hero') && !hero) {   // 히어로가 없으면 화면이 안 그려지니까: 메인 색 바탕을 임시로
@@ -7769,7 +7939,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       var L2 = headLayers('LOCATION', '입지환경', true), y2 = 339, c = P.locCopy, map = null;
       if (P.loc) {
         var lims = (await Promise.all(P.loc.pc.map(function (u, k) { return safe(P.loc.mo[k] || u); }))).filter(Boolean);
-        map = bigOf(lims.filter(function (im) { var r = im.w / im.h; return r > 0.4 && r < 2.6; }));
+        var lok = lims.filter(function (im) { var r = im.w / im.h; return r > 0.4 && r < 2.6; }), lbig = bigOf(lok);
+        map = lok.find(function (im) { return /map|지도|location[_-]?img|loc[_-]?map/i.test(im.name); }) || (lok[0] && lbig && lok[0].w * lok[0].h >= lbig.w * lbig.h * 0.5 ? lok[0] : lbig);
         if (map) map = await cropToMain(map);
       }
       if (map) { L2.push(li(map, 0, y2, 860, 735, 0, '입지 지도')); y2 += 735 + 60; }
@@ -7792,10 +7963,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       //   목록 줄: 메인 색 동그라미 82 + 흰 선 아이콘 42 · 이름 프리텐다드 Bold 30 메인 색 · 설명 26/38px 메인 색 · 줄 사이 40
       var cards = P.commCards || [], cimg = null;
       if (P.comm) cimg = bigOf((await Promise.all(P.comm.pc.map(function (u, k) { return safe(P.comm.mo[k] || u); }))).filter(function (im) { return im && im.w >= 400; }));
-      if (cards.length || cimg) {
+      if (cards.length || cimg || (P.commZones && P.commZones.length)) {
         var L3 = headLayers('COMMUNITY', '커뮤니티', false), y3 = 329;
         var czList = false;
-        if (cimg) {
+        if (P.commZones && P.commZones.length) {   // 0) 커뮤니티 페이지 글·그림 그대로 구역마다 (가장 정확)
+          var czf = await communityFromZones(P.commZones, y3, function (k, n) { prog('커뮤니티 구역 ' + (k + 1) + ' / ' + n, 50 + Math.round(k / n * 9)); });
+          L3 = L3.concat(czf.layers); y3 += czf.h + 100; czList = true;
+        } else if (cimg) {
           // 1) 구역이 있는 커뮤니티 그림(회색 띠 '1BL | SPORTS ZONE' …) = 구역마다 다시 짜기 (수작업처럼)
           var cz = null;
           try { cz = await communityZones(cimg, y3, function (k, n) { prog('커뮤니티 구역 ' + (k + 1) + ' / ' + n + ' (글자 읽는 중)', 50 + Math.round(k / n * 9)); }); } catch (e) { console.warn(e); cz = null; }
@@ -7851,6 +8025,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         var t = P.types[ti], ims = (await Promise.all(t.imgs.map(function (u) { return safe(u); }))).filter(Boolean);
         if (!ims.length) continue;
         var plan = bigOf(ims), key = ims.filter(function (im) { return im !== plan; }).sort(function (a, b) { return a.w * a.h - b.w * b.h; })[0] || null;
+        if (t.json && plan) plan = await planCrop(plan);   // 평면 데이터의 그림은 평면도 + 특화 설명이 세로로 긺 → 첫 평면도만
         tlist.push({ name: t.name, units: t.units, areas: t.areas, plan: plan, key: key, asis: !!plan && plan.h >= plan.w * 0.9 && (t.tab || !t.areas.length) });
       }
       if (tlist.length) {
