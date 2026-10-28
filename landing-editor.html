@@ -557,6 +557,9 @@
   .ab-hover { box-shadow: 0 0 0 1.5px #0d99ff; }
   .ab-hover.is-sec { box-shadow: 0 0 0 1px oklch(65% 0.17 245 / .6); }
   .ab-sel { box-shadow: 0 0 0 1px #0d99ff; }
+  .ab-crop-ghost { opacity: .45; pointer-events: none; max-width: none; }
+  .ab-crop-frame { box-shadow: 0 0 0 1px #fff, 0 0 0 2px #0d99ff; }
+  .ab-crop-img { box-shadow: 0 0 0 1px #0d99ff; }
   .ab-sel.is-sec { box-shadow: 0 0 0 2px #0d99ff; }
   .ab-sel-item { box-shadow: 0 0 0 1px oklch(65% 0.17 245 / .7); }
   .ab-ghost { box-shadow: 0 0 0 1px oklch(65% 0.17 245 / .38); }
@@ -714,6 +717,15 @@
   .ic-pic img { width: 44px; height: 44px; display: block; }
   .ic-pic img.comm { padding: 9px; border-radius: 50%; box-sizing: border-box; }
   .ic-pic span { line-height: 1.25; text-align: center; word-break: keep-all; }
+  /* 인테리어 선택지 */
+  .au-int-r { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 4px 0 6px; }
+  .au-int-r label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .au-int-r select { height: 30px; font-size: 12px; width: auto; }
+  .au-int .inp { height: 32px; font-size: 12.5px; }
+  .ai-list { display: grid; gap: 6px; margin: 4px 0 8px; }
+  .ai-item { display: grid; grid-template-columns: 56px 1fr 64px auto auto; align-items: center; gap: 6px; }
+  .ai-item img, .ai-item .ai-empty { width: 56px; height: 32px; object-fit: cover; border-radius: 4px; display: grid; place-items: center; font-size: 10.5px; color: var(--label); background: var(--line); }
+  .ai-item .inp { height: 30px; font-size: 12px; padding: 0 8px; min-width: 0; }
   /* PDF 자료 넣기 창 */
   .modal-box.pdf-modal { width: min(980px, 96vw); max-height: 92vh; display: flex; flex-direction: column; }
   .pdf-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12.5px; color: var(--label); }
@@ -2707,7 +2719,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       '</div></div>';
   }
   function sectionBody(s, i, multi) {
-    if (s.auto || s.autoTypes) return autoPanel(s);   // 메인 원페이지 자동 구성으로 만든 섹션 (바탕·높이·타입 정보)
+    if (s.auto || s.autoTypes || s.autoInterior) return autoPanel(s);   // 메인 원페이지 자동 구성으로 만든 섹션 (바탕·높이·타입 정보)
     if (!s.images.length && !s.header && !s.join && !multi && !(s.pcImages || []).length) return pickBody(s, i);
     var slide = s.mode === 'slide';
     var pcOn = pcSplitOk(state.editing !== 'main') && !slide;
@@ -5611,6 +5623,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ---------- 고르기 ---------- */
   function abSelect(list, bk, opts) {
+    if (abCrop && !((list || []).length === 1 && list[0].k === 'fl' && list[0].id === abCrop.id)) abCropEnd();
     ab.sel = list || [];
     if (bk) ab.selB = bk;
     opts = opts || {};
@@ -5662,7 +5675,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (he && !ab.sel.some(function (t) { return sameT(t, ab.hover); })) out.push(box(abToScreen(hb, elRect(he)), 'ab-hover' + (ab.hover.k === 'sec' ? ' is-sec' : '')));
     }
     // 고른 것 (다른 대지엔 옅게)
-    var u = abSelUnion();
+    var cu = abCrop ? abCropUi() : null;
+    if (cu) out = out.concat(cu);
+    var u = cu ? null : abSelUnion();
     if (u) {
       ab.boards.forEach(function (b) {
         if (b === u.b) return;
@@ -5998,7 +6013,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var t = b ? abPick(b, w.x - b.x, w.y - b.y) : null;
     var nh = t && t.k !== 'board' ? t : null;
     if (!sameT(nh, ab.hover) || (nh && ab.hover && nh.b !== ab.hover.b)) { ab.hover = nh; abDraw(); }
-    abHit.style.cursor = ab.space ? 'grab' : ab.tool === 'text' ? 'text' : ab.tool === 'rect' || ab.tool === 'line' ? 'crosshair' : 'default';
+    abHit.style.cursor = ab.space ? 'grab' : abCrop && abCropIn(w) ? 'move' : ab.tool === 'text' ? 'text' : ab.tool === 'rect' || ab.tool === 'line' ? 'crosshair' : 'default';
   });
   abHit.addEventListener('pointerleave', function () { if (!ab.drag && ab.hover) { ab.hover = null; abDraw(); } });
   abHit.addEventListener('pointerdown', function (e) {
@@ -6007,6 +6022,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (e.button === 1 || ab.space || (e.button === 0 && ab.tool === 'hand')) { ab.drag = { mode: 'pan', sx: p.sx, sy: p.sy, x: ab.x, y: ab.y }; abHit.style.cursor = 'grabbing'; e.preventDefault(); return; }
     abMenuClose();
     if (e.button !== 0) return;
+    if (abCrop) { var cg = abCropIn(w); if (cg) { ab.drag = { mode: 'cropmove', w0: w, g: cg, moved: false }; return; } abCropEnd(); }
     var b = abBoardAt(w.x, w.y), lx = b ? w.x - b.x : 0, ly = b ? w.y - b.y : 0;
     var t = b ? abPick(b, lx, ly, (e.ctrlKey || e.metaKey) && ab.tool === 'move') : null;
     if (ab.tool === 'text' || ab.tool === 'rect' || ab.tool === 'line') {
@@ -6038,7 +6054,59 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   abHit.addEventListener('dblclick', function () {
     var x = selFl()[0];
     if (x && x.L.t === 'text') abEditText(x);
+    else if (abCrop) abCropEnd();
+    else if (x && x.L.t === 'img' && ab.sel.length === 1) abCropStart(x);
   });
+  /* ---------- 사진 위치 고치기 (사진 두 번 누르기 · Enter) ----------
+     피그마 자르기 모드처럼: 프레임(칸)은 그대로, 원본 사진 전체가 보이고(프레임 밖은 흐리게) 끌면 프레임 안에서 사진이 움직이고
+     모서리 손잡이로 사진 크기 (비율 그대로). 사진은 늘 프레임을 꽉 채움. Enter · Esc · 바깥 누르기 · 다시 두 번 누르기 = 끝 */
+  var abCrop = null;   // { host, id, bk }
+  function abCropL() { return abCrop ? flGet(abCrop.host, abCrop.id) : null; }
+  function abCropStart(x) {
+    var L = x && x.L; if (!L || L.t !== 'img' || !L.img || L.locked) return false;
+    abEditEnd();
+    if (!L.h) L.h = L.w * L.img.h / L.img.w;   // 칸 없는 사진 → 지금 보이는 크기 그대로 칸으로
+    if (!L.crop) flSetCrop(L, flImgRect(L));   // 보이는 위치(fx·fy) → 자른 값으로
+    abCrop = { host: x.t.host, id: L.id, bk: ab.selB };
+    flLive(x.t.host, L); abDraw();
+    toast('사진 위치 고치기: 끌어서 옮기고 모서리로 크기 · 끝내기 = Enter · Esc · 바깥 누르기');
+    return true;
+  }
+  function abCropEnd() { if (!abCrop) return; var c = abCrop; abCrop = null; abHit.style.cursor = 'default'; flCommit(c.host); abDraw(); }
+  function abCropGeo() {   // 대지 좌표: H = 칸 주인, F = 프레임, I = 사진 전체 자리
+    var L = abCropL(), b = abCrop && abBoardByKey(abCrop.bk); if (!L || !b || !L.h) return null;
+    var he = hostEl(b, abCrop.host); if (!he) return null;
+    var H = elRect(he), I = flImgRect(L);
+    return { L: L, b: b, H: H, F: { x: H.x + L.x * H.w, y: H.y + L.y * H.w, w: L.w * H.w, h: L.h * H.w }, I: { x: H.x + I.x * H.w, y: H.y + I.y * H.w, w: I.w * H.w, h: I.h * H.w } };
+  }
+  function abCropUi() {
+    var g = abCropGeo(); if (!g) { abCrop = null; return null; }
+    var si = abToScreen(g.b, g.I), sf = abToScreen(g.b, g.F), p = function (v) { return v.toFixed(1) + 'px'; }, out = [];
+    var x0 = sf.x - si.x, y0 = sf.y - si.y, x1 = x0 + sf.w, y1 = y0 + sf.h;
+    out.push('<img class="ab-crop-ghost" src="' + g.L.img.url + '" alt="" style="left:' + p(si.x) + ';top:' + p(si.y) + ';width:' + p(si.w) + ';height:' + p(si.h) +
+      ';clip-path:polygon(evenodd,0 0,100% 0,100% 100%,0 100%,0 0,' + p(x0) + ' ' + p(y0) + ',' + p(x1) + ' ' + p(y0) + ',' + p(x1) + ' ' + p(y1) + ',' + p(x0) + ' ' + p(y1) + ',' + p(x0) + ' ' + p(y0) + ')">');
+    out.push(box(sf, 'ab-crop-frame'), box(si, 'ab-sel ab-crop-img'));
+    ['nw', 'ne', 'sw', 'se'].forEach(function (h) { var hx = si.x + (h[1] === 'w' ? 0 : si.w), hy = si.y + (h[0] === 'n' ? 0 : si.h); out.push('<i class="ab-h" data-h="' + h + '" style="left:' + (hx - 4).toFixed(1) + 'px;top:' + (hy - 4).toFixed(1) + 'px"></i>'); });
+    out.push(tag(si.x + si.w / 2, si.y + si.h + 8, Math.round(g.I.w) + ' × ' + Math.round(g.I.h), 'ab-size'));
+    return out;
+  }
+  function abCropIn(w) { var g = abCropGeo(); return g && w.x >= g.I.x && w.x <= g.I.x + g.I.w && w.y >= g.I.y && w.y <= g.I.y + g.I.h ? g : null; }
+  function abCropMove(e, w) {   // 끄는 동안: 사진 자리 바꾸기 (flSetCrop 이 프레임을 꽉 채우게 맞춤)
+    var dg = ab.drag, g = dg.g, I0 = g.I, dx = w.x - dg.w0.x, dy = w.y - dg.w0.y, nr = I0.h / I0.w, N;
+    if (dg.mode === 'cropmove') {
+      if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+      N = { x: I0.x + dx, y: I0.y + dy, w: I0.w };
+    } else {
+      var sx = dg.dir.indexOf('e') >= 0 ? 1 : -1, sy = dg.dir.indexOf('s') >= 0 ? 1 : -1;
+      var s = Math.max((I0.w + sx * dx) / I0.w, (I0.h + sy * dy) / I0.h, 0.05);
+      if (e.altKey) N = { x: I0.x + I0.w / 2 - I0.w * s / 2, y: I0.y + I0.h / 2 - I0.h * s / 2, w: I0.w * s };   // Alt = 가운데 기준
+      else N = { x: sx > 0 ? I0.x : I0.x + I0.w - I0.w * s, y: sy > 0 ? I0.y : I0.y + I0.h - I0.h * s, w: I0.w * s };
+    }
+    flSetCrop(g.L, { x: (N.x - g.H.x) / g.H.w, y: (N.y - g.H.y) / g.H.w, w: N.w / g.H.w });
+    dg.moved = true;
+    flLive(abCrop.host, g.L); abDraw();
+  }
+
   // 글 레이어를 대지 위에서 바로 고치기 (두 번 누르기 · Enter). Esc나 다른 곳을 누르면 끝
   var abEditing = null;
   function abEditText(x) {
@@ -6094,6 +6162,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     e.preventDefault(); e.stopPropagation();
     abHit.setPointerCapture(e.pointerId);
     var p = abPoint(e), w = abWorldAt(p.sx, p.sy);
+    if (abCrop) { var cg2 = abCropGeo(); if (cg2) ab.drag = { mode: 'cropsize', dir: h.getAttribute('data-h'), w0: w, g: cg2, moved: false }; return; }
     abStartResize(h.getAttribute('data-h'), w);
   });
 
@@ -6135,6 +6204,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   function abDragMove(e, w) {
     var dg = ab.drag;
     if (dg.mode === 'pan') { var p = abPoint(e); ab.x = dg.x + (p.sx - dg.sx); ab.y = dg.y + (p.sy - dg.sy); abApply(); return; }
+    if (dg.mode === 'cropmove' || dg.mode === 'cropsize') { abCropMove(e, w); return; }
     var dx = w.x - (dg.w0 ? dg.w0.x : dg.start.x), dy = w.y - (dg.w0 ? dg.w0.y : dg.start.y);
     if (!dg.moved) { if (Math.abs(dx) * ab.z < 3 && Math.abs(dy) * ab.z < 3) return; dg.moved = true; }
     var snapOff = e.ctrlKey || e.metaKey;   // Ctrl 누르고 끌면 스냅 없이
@@ -6259,6 +6329,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var dg = ab.drag; if (!dg) return;
     ab.drag = null; ab.guides = [];
     if (dg.mode === 'pan') { abHit.style.cursor = ab.space ? 'grab' : 'default'; return; }
+    if (dg.mode === 'cropmove' || dg.mode === 'cropsize') { if (dg.moved && abCrop) flCommit(abCrop.host); return; }
     if (dg.mode === 'move' && !dg.moved && dg.dup) {   // Alt만 누르고 안 끌었으면 복제 취소
       var hs0 = {};
       dg.items.forEach(function (it) { var l = flList(it.t.host), i = l.indexOf(it.L); if (i >= 0) l.splice(i, 1); hs0[it.t.host] = 1; });
@@ -6475,7 +6546,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   var KEY_HELP = [
     ['고르기', [['누르기', '맨 위 레이어'], ['Ctrl + 누르기', '겹친 아래 레이어 (누를 때마다 한 칸씩 아래로)'], ['오른쪽 클릭', '그 자리 레이어 목록에서 고르기'], ['Shift + 누르기', '여러 개 고르기'], ['끌기 (빈 곳)', '상자로 고르기 · Shift면 더하기'], ['Tab / Shift + Tab', '다음 · 앞 레이어'], ['Ctrl + A', '같은 칸 레이어 다 고르기'], ['Esc', '고르기 풀기'], ['왼쪽 목록 ▸ 누르기', '섹션 접기 · 펼치기 (Alt = 전부)'], ['Alt + L', '왼쪽 목록 전부 접기']]],
     ['옮기기', [['끌기', '옮기기 (주변에 붙음)'], ['Shift + 끌기', '가로나 세로로만'], ['Alt + 끌기', '복제해서 옮기기'], ['Ctrl + 끌기', '붙지 않게'], ['화살표', '1px (Shift 10px)']]],
-    ['크기', [['손잡이 끌기', '크기 바꾸기'], ['Shift + 손잡이', '비율 그대로'], ['Alt + 손잡이', '가운데 기준'], ['Ctrl + 손잡이', '사진: 자르기 (사진은 그대로 칸만) · 글·상자: 붙지 않게'], ['글 모서리 손잡이', '글자 크기까지 같이'], ['Ctrl + 화살표', '크기 1px (Shift 10px)']]],
+    ['크기', [['손잡이 끌기', '크기 바꾸기'], ['Shift + 손잡이', '비율 그대로'], ['Alt + 손잡이', '가운데 기준'], ['Ctrl + 손잡이', '사진: 자르기 (사진은 그대로 칸만) · 글·상자: 붙지 않게'], ['사진 두 번 누르기 · Enter', '사진 위치 고치기: 프레임 안에서 사진 끌기 · 모서리 = 사진 크기 (Alt = 가운데 기준) · Enter·Esc = 끝'], ['글 모서리 손잡이', '글자 크기까지 같이'], ['Ctrl + 화살표', '크기 1px (Shift 10px)']]],
     ['편집', [['Ctrl + C / V', '복사 · 붙여넣기'], ['Ctrl + D', '복제'], ['Delete', '삭제'], ['Ctrl + ] / [', '앞으로 · 뒤로 (Shift = 맨 앞 · 맨 뒤)'], ['Ctrl + Shift + H', '숨기기 · 보이기'], ['Ctrl + Shift + L', '잠그기 · 풀기'], ['Enter / 두 번 누르기', '글 고치기'], ['Ctrl + Z', '되돌리기']]],
     ['도구 · 화면', [['V · T · R · L', '이동 · 텍스트 · 사각형 · 선'], ['Alt 누르고 있기', '거리 보기'], ['스페이스 + 끌기', '화면 옮기기'], ['Ctrl + 휠', '확대 · 축소'], ['Shift + 1 / 2', '다 보기 · 고른 것 보기'], ['Ctrl + 0', '100%']]]
   ];
@@ -6786,6 +6857,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     else if (mod && (c === 'Digit0' || c === 'Numpad0')) abZoomAt(1);
     else if (mod && (c === 'Equal' || c === 'NumpadAdd')) abZoomStep(1);
     else if (mod && (c === 'Minus' || c === 'NumpadSubtract')) abZoomStep(-1);
+    else if (abCrop && (c === 'Escape' || c === 'Enter') && !mod) abCropEnd();
     else if (c === 'Escape') { if (ab.tool !== 'move') abTool('move'); else if (ab.sel.length) abSelect([]); else done = false; }
     else if ((c === 'Delete' || c === 'Backspace') && !mod) done = abDelete();
     else if (c.indexOf('Arrow') === 0 && !mod) { var st = e.shiftKey ? 10 : 1; done = abNudge(c === 'ArrowLeft' ? -st : c === 'ArrowRight' ? st : 0, c === 'ArrowUp' ? -st : c === 'ArrowDown' ? st : 0); }
@@ -6795,7 +6867,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     else if (mod && c === 'KeyA' && !e.shiftKey) { var h0 = abCurHost(), l0 = h0 ? flList(h0) || [] : []; if (l0.length) abSelect(l0.map(function (L) { return { k: 'fl', host: h0, id: L.id }; })); else done = false; }
     else if (mod && c === 'BracketRight') abOrder(e.shiftKey ? 9 : 1);
     else if (mod && c === 'BracketLeft') abOrder(e.shiftKey ? -9 : -1);
-    else if (c === 'Enter' && !mod) { var x = selFl()[0]; if (x && x.L.t === 'text') abEditText(x); else done = false; }
+    else if (c === 'Enter' && !mod) { var x = selFl()[0]; if (x && x.L.t === 'text') abEditText(x); else if (x && x.L.t === 'img' && ab.sel.length === 1) done = abCropStart(x); else done = false; }
     else done = false;
     if (done) { e.preventDefault(); e.stopPropagation(); }
   }, true);
@@ -7840,6 +7912,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       var fi = home ? await scanCall({ op: 'text', url: irow.item.url }).catch(function () { return null; }) : null, itb = fi ? typesFromTabs(fi.flow, true) : [];
       P.interior = (itb.length ? itb : irow.P.pc.map(function (u) { return { name: '', img: u }; })).slice(0, 6);
     }
+    var vrow = scanRows(d).find(function (x) { return (/e\s*모델|모델\s*하우스|사이버\s*견본|^vr$/i.test(x.item.name) || /e_?model|modelhouse|cyber|(^|[\/_\-])vr([\/_.\-]|$)/i.test(x.item.url)) && !/커뮤니티|community|c_vr/i.test(x.item.name + ' ' + x.item.url); });
+    P.vrUrl = vrow ? vrow.item.url : '';   // E모델하우스 (인테리어 캡처)
     var secs = flowSecs(home && home.flow), h0 = secs.find(function (s) { return /[가-힣]{2}/.test(s.text); }) || secs[0];
     // 히어로: 첫 구역 배경 (휴대폰용 media 우선) + 첫 문구
     var bgs = (home && home.bgs || []).filter(function (b) { return !/::(?!after|before)|txt|text|title|copy|logo|btn|arrow|icon|line|dot|deco|pattern|shadow|sub[_-]?visual|circle|mask/i.test(b.s + ' ' + b.u.split('/').pop()); })
@@ -7953,7 +8027,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     autoShowPlan();
   }
   var AUTO_ROWS = [
-    ['interior', '인테리어', function (P) { return P.interior && P.interior.length ? '사진 ' + P.interior.length + '장' + (P.interior[0].name ? ' (' + P.interior.map(function (x) { return x.name; }).join(' · ') + ')' : '') + ' · 홈페이지 E모델하우스' : ''; }],
+    ['interior', '인테리어', function (P) { var n = P.interior && P.interior.length; return ((P.vrUrl ? 'E모델하우스 캡처 가능' : '') + (n ? (P.vrUrl ? ' · ' : '') + '홈페이지 사진 ' + n + '장' + (P.interior[0].name ? ' (' + P.interior.map(function (x) { return x.name; }).join(' · ') + ')' : '') : '')) || '빈 칸으로 (캡처한 사진은 나중에 넣기)'; }],
     ['hero', '히어로', function (P) { return (P.heroMo ? (P.heroGuess ? '파일 이름으로 찾은 첫 화면 사진' : P.heroPoster ? '첫 화면 동영상의 대표 그림' : '첫 화면 배경 사진') : '사진을 못 찾아서 메인 색 바탕으로 (나중에 사진만 바꾸면 돼요)') + (P.heroSub ? ' + 문구 “' + P.heroSub + '”' : ''); }],
     ['premium', '프리미엄', function (P) { return P.premium.length >= 2 ? P.premium.length + '개 (' + P.premium.map(function (x) { return x.head.replace(/\n/g, ' '); }).join(' · ') + ')' : '우리 템플릿으로 (' + (P.prem ? '홈페이지 프리미엄 그림의 글자를 읽어서' : '글은 비워 둔 칸 4개') + ')'; }],
     ['location', '입지환경', function (P) { return P.loc || P.locCopy ? (P.locCopy ? '문구 “' + oneLine(P.locCopy.head) + '”' : '') + (P.loc ? (P.locCopy ? ' + ' : '') + '지도' : '') : ''; }],
@@ -7962,11 +8036,24 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     ['types', '타입안내', function (P) { return P.pdfCards && P.pdfCards.length ? 'PDF에서 ' + P.pdfCards.length + '개 타입 슬라이드 (' + P.pdfCards.map(function (t) { return t.name; }).join(' · ') + ')' : P.types.length ? P.types.length + '개 타입 슬라이드 (' + P.types.map(function (t) { return t.name; }).join(' · ') + ')' : ''; }],
     ['summary', '사업개요', function (P) { return P.sumRows && P.sumRows.length >= 3 ? P.sumRows.length + '줄 (' + P.sumRows.map(function (r) { return r[0]; }).join(' · ') + ')' : P.sum || P.facts.length ? (P.sum ? '표 글자를 읽어서 정리 (처음 한 번 글자 읽기 도구를 받아요)' : '세대수·위치') : ''; }]
   ];
+  // 자동 구성 창의 인테리어 선택지 (사진 · 모양 · E모델하우스 주소)
+  function intOpts(P) {
+    var hasHome = !!(P.interior && P.interior.length), src = P.intSrc || (P.vrUrl ? 'vr' : hasHome ? 'home' : 'empty'), sel = function (v, cur) { return v === cur ? ' selected' : ''; };
+    return '<div class="au-copy au-int"><b>인테리어</b><span>팀 방식: E모델하우스 직접 캡처 · 타입 2~3개면 타입마다 거실·침실, 1개면 거실·주방·침실·욕실 (슬라이드 모양이면 타입마다 4곳)</span>' +
+      '<div class="au-int-r"><label>사진 <select class="inp" id="au-int-src"><option value="vr"' + sel('vr', src) + '>E모델하우스 캡처 (사내 서버)</option><option value="home"' + sel('home', src) + (hasHome ? '' : ' disabled') + '>홈페이지 사진</option><option value="empty"' + sel('empty', src) + '>빈 칸 (캡처해서 직접 넣기)</option></select></label>' +
+      '<label>모양 <select class="inp" id="au-int-form"><option value="rule">규칙대로 (세로로)</option><option value="slide"' + sel('slide', P.intForm) + '>타입마다 슬라이드</option></select></label></div>' +
+      '<input class="inp" id="au-int-url" spellcheck="false" placeholder="E모델하우스 주소 (홈페이지 e모델하우스 메뉴 주소도 돼요)" value="' + esc(P.vrUrl || '') + '"></div>';
+  }
+  function auSaveOpts() {   // 창을 다시 그리기 전에 고른 것 기억
+    var cp = $('#au-copy'), a = $('#au-int-src'), b = $('#au-int-form'), c = $('#au-int-url');
+    if (cp) autoCopyDraft = cp.value;
+    if (a && autoPlan) { autoPlan.intSrc = a.value; autoPlan.intForm = b.value; autoPlan.vrUrl = c.value.trim(); }
+  }
   function autoShowPlan() {
     var P = autoPlan, d = lastScan;
     var rows = AUTO_ROWS.map(function (r) {
-      var what = r[2](P), on = !!what;
-      return '<label class="au-row' + (on ? '' : ' is-off') + '"><input type="checkbox" data-au="' + r[0] + '"' + (on ? ' checked' : ' disabled') + '><b>' + r[1] + '</b><span>' + esc(what || '홈페이지에서 못 찾았어요') + '</span>' +
+      var what = r[2](P), on = !!what, chk = on && !(r[0] === 'interior' && !P.vrUrl && !(P.interior && P.interior.length));   // 인테리어 자료가 없으면 켜 둘 수만 있게
+      return '<label class="au-row' + (on ? '' : ' is-off') + '"><input type="checkbox" data-au="' + r[0] + '"' + (chk ? ' checked' : on ? '' : ' disabled') + '><b>' + r[1] + '</b><span>' + esc(what || '홈페이지에서 못 찾았어요') + '</span>' +
         (r[0] === 'types' ? '<span class="au-opt"><button class="btn small" type="button" id="au-pdf-types" title="공급안내 PDF의 타입 카드(이름·세대수·면적·평면도)로 그려요">' + (P.pdfCards && P.pdfCards.length ? 'PDF 다시 고르기' : 'PDF에서 가져오기') + '</button></span>' : '') +
         (r[0] === 'premium' && P.premium.length >= 2 ? '<span class="au-opt"><select class="inp" id="au-prem-pic"><option value="stock">사진: 우리 스톡</option><option value="home"' + (P.premium.every(function (x) { return x.img; }) ? '' : ' disabled') + '>사진: 홈페이지 것</option></select></span>' : '') + '</label>';
     }).join('');
@@ -7974,11 +8061,138 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     modal('<h3>메인 원페이지로 자동 구성</h3>' +
       '<p class="imp-sum"><b>' + esc(d.site.title || '') + '</b>' + (P.brand ? ' · 메인 색 <i class="au-sw" style="background:' + P.brand + '"></i>' + P.brand : '') + '<br>우리 규칙(섹션 제목·글자 크기·바탕색·순서)대로 만들어요. 글·사진·상자는 대지에서 하나씩 눌러 고칠 수 있어요.' +
       (P.noText ? '<br><em>' + esc(P.noText) + '</em>' : '') + (P.noData ? '<br><em>' + esc(P.noData) + '</em>' : '') + '</p>' +
-      '<div class="au-list">' + rows + '</div>' +
+      '<div class="au-list">' + rows + '</div>' + intOpts(P) +
       '<div class="au-copy"><b>분양안내 (인트로)</b><span>분양상담사 문안을 붙여 넣으면 평면·입지·교통·커뮤니티처럼 다른 섹션과 겹치는 건 빼고, 계약 조건·혜택·특장점만 골라 만들어요 (비워 두면 안 만들어요)</span>' +
       '<textarea class="inp" id="au-copy" rows="4" placeholder="(광고)OO 분양소식&#10;■ 특별분양 조건&#10;- 발코니 확장비 무상 …">' + esc(autoCopyDraft) + '</textarea></div>' +
       (had ? '<p class="desc au-warn">지금 메인 페이지에 있는 섹션·히어로는 이걸로 바뀌어요 (방문예약 폼은 그대로 · Ctrl+Z로 되돌릴 수 있어요)</p>' : '') +
       '<div class="acts"><button class="btn" type="button" id="au-back">← 메뉴 페이지로 가져오기</button><button class="btn primary" type="button" id="au-go">만들기</button></div>', 'wide');
+  }
+
+  /* ---------- 인테리어 (팀 03_interior_m): 모양 2가지 × 사진 3가지 ----------
+     모양 rule  = 규칙대로: 타입 2~3개면 타입마다 거실·침실, 1개면 거실·주방·침실·욕실 → 탭(메인 색 '84㎡A  |  거실') + 사진 760×400 을 세로로
+          slide = 타입마다 슬라이드: 탭 = 타입, 슬라이드 한 장 = 거실·주방·침실·욕실 2×2
+     사진 vr    = E모델하우스 캡처 (사내 서버가 그 컴퓨터의 크롬으로 VR 장면을 찍음 · 마법도구에선 안 됨)
+          home  = 홈페이지 인테리어·갤러리 사진 · empty = 빈 칸 (캡처한 사진을 나중에 넣기)
+     섹션에 s.autoInterior = { form, src, url, items:[{ type, label, room, im }] } → 오른쪽 칸에서 모양·사진·이름을 바꾸고 다시 그림 */
+  var INT_ROOMS4 = ['거실', '주방', '침실', '욕실'], ROOM_EN = { 거실: 'living', 주방: 'kitchen', 침실: 'bedroom', 욕실: 'bath' };
+  function typeDisp(n) { return /^\d{2,3}[A-Za-z]{0,2}\d?$/.test(n || '') ? String(n).replace(/^(\d{2,3})/, '$1㎡') : (n || ''); }
+  function intSlots(types, form) {   // 빈 칸: 규칙대로 방 고르기
+    var rooms = form === 'slide' || types.length === 1 ? INT_ROOMS4 : ['거실', '침실'], out = [];
+    types.slice(0, form === 'slide' ? 6 : 3).forEach(function (t) { rooms.forEach(function (r) { out.push({ type: t, label: typeDisp(t), room: r, im: null }); }); });
+    return out;
+  }
+  async function ratioCrop(im, R, name) {   // 가운데를 비율 R(가로/세로)로
+    var bmp = await createImageBitmap(im.blob), W = bmp.width, H = bmp.height, cw = W, ch = W / R;
+    if (ch > H) { ch = H; cw = H * R; }
+    var ow = Math.round(Math.min(1520, cw)), oh = Math.round(ow / R), c = canvas(ow, oh), x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high'; x.drawImage(bmp, (W - cw) / 2, (H - ch) / 2, cw, ch, 0, 0, ow, oh); bmp.close();
+    return loadImg(await toBlob(c, 'image/jpeg', 0.9), name);
+  }
+  async function intHolder(text, w, h, name) {   // 빈 칸 그림: 연한 회색 + '84㎡A | 거실 · 캡처한 사진을 넣어 주세요'
+    var c = canvas(w, h), x = c.getContext('2d');
+    x.fillStyle = '#eef0f3'; x.fillRect(0, 0, w, h);
+    x.strokeStyle = '#c3c8d0'; x.lineWidth = Math.max(2, w / 380); x.setLineDash([w / 60, w / 90]); x.strokeRect(x.lineWidth, x.lineWidth, w - x.lineWidth * 2, h - x.lineWidth * 2);
+    x.fillStyle = '#8a919c'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = fontCss('pretendard', 700, Math.round(w / 22)); x.fillText(text, w / 2, h / 2 - w / 34);
+    x.font = fontCss('pretendard', 400, Math.round(w / 34)); x.fillText('캡처한 사진을 넣어 주세요', w / 2, h / 2 + w / 30);
+    var im = await loadImg(await toBlob(c, 'image/png'), name); im.holder = true;
+    return im;
+  }
+  function vrErr(e) {
+    var m = String(e && e.message || e);
+    return /모르는 요청|op: vr/.test(m) ? 'E모델하우스 자동 캡처는 사내 서버 에디터에서만 돼요 (그 컴퓨터의 크롬으로 찍어요)' : 'E모델하우스를 못 찍었어요: ' + m;
+  }
+  async function vrItems(url, form) {   // 사내 서버가 찍은 장면 → 칸
+    var r = await scanCall({ op: 'vr', url: url, form: form, maxTypes: 3 }), out = [];
+    for (var i = 0; i < (r.types || []).length; i++) {
+      var t = r.types[i];
+      for (var j = 0; j < t.rooms.length; j++) {
+        var x = t.rooms[j], blob = await (await fetch(x.img)).blob();
+        out.push({ type: t.name, label: t.label || typeDisp(t.name), room: x.room, im: await loadImg(blob, 'vr_' + String(t.name).replace(/[^A-Za-z0-9]+/g, '') + '_' + (ROOM_EN[x.room] || 'room') + (j + 1) + '.jpg') });
+      }
+    }
+    if (!out.length) throw new Error('VR에서 거실·침실 장면을 못 찾았어요');
+    return out;
+  }
+  async function intSections(spec) {
+    var items = spec.items || [];
+    await fontsReady(items.map(function (it) { return it.label + it.room; }).join('') + '캡처한 사진을 넣어 주세요 |0123456789㎡');
+    mctx = mctx || canvas(1, 1).getContext('2d');
+    if (spec.form !== 'slide') {
+      var L = headLayers('INTERIOR', '인테리어', false), y = 339;
+      mctx.font = fontCss('pretendard', 700, 32);
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i], tab = it.label + (it.room ? '  |  ' + it.room : ''), fk = 'interior_' + (i + 1) + '.jpg';
+        var ph = it.im ? (spec.src === 'home' && !it.vr ? await interiorCrop(it.im) : await ratioCrop(it.im, 760 / 400, fk)) : await intHolder(tab || '인테리어', 1520, 800, 'interior_empty_' + (i + 1) + '.png');
+        if (tab.trim()) {
+          var tw = Math.max(160, Math.round(mctx.measureText(tab).width) + 60);
+          L.push(lr(50, y, tw, 62, 'brand', [20, 20, 0, 0], '인테리어 탭'), Object.assign(lt({ text: tab, x: 80, y: y + 15, w: tw - 50, weight: 700, size: 32, lh: 1, color: 'onbrand' }), { name: '인테리어 이름' }));
+        }
+        L.push(Object.assign(li(ph, 50, y + 62, 760, 400, 0, '인테리어 사진'), { strokeW: afs(1), stroke: 'brand' }));
+        y += 502;
+      }
+      var s1 = await autoSection('interior', '인테리어', '#ffffff', Math.max(y, 339 + 40) - 40 + 100, L);
+      s1.autoInterior = spec;
+      return [s1];
+    }
+    // 타입마다 슬라이드: 타입 묶음 → 2×2 (방 이름 탭 + 사진 380×253)
+    var groups = [];
+    items.forEach(function (it) { var g = groups.find(function (q) { return q.label === it.label; }); if (!g) groups.push(g = { label: it.label, type: it.type, list: [] }); g.list.push(it); });
+    var brand = normHex(state.brand) || '#001241', onb = onBrand(), imgs = [];
+    for (var gi = 0; gi < groups.length; gi++) {
+      var g = groups[gi], one = g.list.length === 1, cw = one ? 780 : 380, ch = Math.round(cw / 1.5), rows = one ? 1 : Math.ceil(g.list.length / 2);
+      var H = 40 + rows * (44 + ch) + (rows - 1) * 30 + 40, c = canvas(AW, H), x = c.getContext('2d');
+      x.fillStyle = '#ffffff'; x.fillRect(0, 0, AW, H);
+      for (var k = 0; k < g.list.length; k++) {
+        var q = g.list[k], cx = 40 + (one ? 0 : (k % 2) * (cw + 20)), cy = 40 + Math.floor(k / 2) * (44 + ch + 30);
+        var pim = q.im ? await ratioCrop(q.im, 1.5, 'tmp.jpg') : await intHolder(q.room || g.label || '인테리어', cw * 2, ch * 2, 'tmp.png'), bmp = await createImageBitmap(pim.blob);
+        if (q.room) {
+          x.font = fontCss('pretendard', 700, 22); var tw2 = Math.max(110, Math.round(x.measureText(q.room).width) + 44);
+          x.fillStyle = brand; x.beginPath(); if (x.roundRect) x.roundRect(cx, cy, tw2, 44, [14, 14, 0, 0]); else x.rect(cx, cy, tw2, 44); x.fill();
+          x.fillStyle = onb; x.textBaseline = 'middle'; x.textAlign = 'left'; x.fillText(q.room, cx + 22, cy + 23);
+        }
+        x.imageSmoothingQuality = 'high'; x.drawImage(bmp, cx, cy + 44, cw, ch); bmp.close();
+        x.strokeStyle = brand; x.lineWidth = 1; x.strokeRect(cx + 0.5, cy + 44.5, cw - 1, ch - 1);
+      }
+      var sim = await loadImg(await toBlob(c, 'image/jpeg', 0.92), 'interior_' + (String(g.type || '').replace(/[^A-Za-z0-9]+/g, '') || gi + 1) + '.jpg');
+      sim.label = g.label || '타입 ' + (gi + 1); sim.alt = '인테리어 ' + sim.label;
+      imgs.push(sim);
+    }
+    var th = await autoSection('interior', '인테리어', '#ffffff', 379, headLayers('INTERIOR', '인테리어', false), { id: 's-interior-title' });
+    var ss = newSection({ id: 's-interior', key: 'interior', label: '인테리어', order: SECTION_DEFS.interior.order + 0.01, mode: 'slide', tabs: true, join: true, nav: false });
+    ss.images = imgs; ss.band = 0; ss.autoInterior = spec;
+    return [th, ss];
+  }
+  // 오른쪽 칸에서 바꾼 뒤 다시 그리기: 지금 인테리어 섹션(제목 포함)을 같은 자리에서 바꿈
+  async function intRebuild(s, patch) {
+    var spec = Object.assign({}, s.autoInterior, patch || {}), L = state.sections;
+    var isInt = function (x) { return x.key === 'interior' && (x.autoInterior || x.id === 's-interior-title'); };
+    var at = L.findIndex(isInt), neo = await intSections(spec);
+    for (var i = L.length - 1; i >= 0; i--) if (isInt(L[i])) L.splice(i, 1);
+    if (at < 0 || at > L.length) at = L.length;
+    L.splice.apply(L, [at, 0].concat(neo));
+    fixJoins(L);
+    afterImagesChanged(); render(); changed({});
+    return neo;
+  }
+  // 자동 구성: 고른 사진·모양으로 칸 만들기
+  async function intItems(P, prog, warn) {
+    var form = P.intForm === 'slide' ? 'slide' : 'rule', src = P.intSrc || (P.vrUrl ? 'vr' : P.interior && P.interior.length ? 'home' : 'empty');
+    if (src === 'vr') {
+      prog('E모델하우스 찍는 중 (1분쯤 걸려요)', 18);
+      try { return { form: form, src: 'vr', url: P.vrUrl, items: (await vrItems(P.vrUrl, form)).map(function (it) { it.vr = true; return it; }) }; }
+      catch (e) { warn.push(vrErr(e) + ' → ' + (P.interior && P.interior.length ? '홈페이지 사진으로 넣었어요' : '빈 칸으로 만들었어요. 캡처한 사진을 오른쪽 칸에서 넣어 주세요')); src = P.interior && P.interior.length ? 'home' : 'empty'; }
+    }
+    if (src === 'home' && P.interior && P.interior.length) {
+      var hs = [];
+      for (var i = 0; i < P.interior.length; i++) { var u = P.interior[i]; try { hs.push({ type: u.name || '', label: typeDisp(u.name || ''), room: '', im: await urlIm(u.img) }); } catch (e) { /* 못 받은 사진은 뺌 */ } }
+      if (hs.length) return { form: form, src: 'home', url: P.vrUrl || '', items: hs };
+    }
+    var names = (P.interior || []).map(function (x) { return x.name; }).filter(Boolean);
+    if (!names.length) names = (P.pdfCards && P.pdfCards.length ? P.pdfCards : P.types || []).map(function (t) { return t.name; }).slice(0, 2);
+    names = names.filter(function (n, k) { return names.indexOf(n) === k; });
+    if (!names.length) names = ['타입A', '타입B'];
+    return { form: form, src: 'empty', url: P.vrUrl || '', items: intSlots(names, form) };
   }
 
   /* ---------- 만들기 ---------- */
@@ -8025,26 +8239,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       hero = { bg: await loadImg(await toBlob(hc, 'image/jpeg', 0.9), 'hero_brand.jpg'), pc: null };
       warn.push('히어로 사진을 못 찾아서 메인 색 바탕으로 넣었어요. 왼쪽 [히어로]에서 배경 사진만 바꿔 주세요');
     }
-    // 인테리어 (팀 03_interior_m): 탭(메인 색 262×62, 위 모서리 20 · 이름 Bold 32 흰색) + 사진 760×400 (메인 색 1px 테두리) · 한 칸 462 + 사이 40
-    if (on('interior') && P.interior && P.interior.length) {
-      prog('인테리어', 20);
-      var L6 = headLayers('INTERIOR', '인테리어', false), y6 = 339, smallW = 0;
-      await fontsReady(P.interior.map(function (x) { return x.name; }).join('') + '0123456789');
-      mctx = mctx || canvas(1, 1).getContext('2d'); mctx.font = fontCss('pretendard', 700, 32);
-      for (var ii = 0; ii < P.interior.length; ii++) {
-        var it6 = P.interior[ii], src6 = await safe(it6.img); if (!src6) continue;
-        if (src6.w < 1000) smallW = Math.max(smallW, src6.w);
-        var ph6 = await interiorCrop(src6);
-        if (it6.name) {
-          var tw6 = Math.max(160, Math.round(mctx.measureText(it6.name).width) + 60);
-          L6.push(lr(50, y6, tw6, 62, 'brand', [20, 20, 0, 0], '인테리어 탭'), Object.assign(lt({ text: it6.name, x: 80, y: y6 + 15, w: tw6 - 50, weight: 700, size: 32, lh: 1, color: 'onbrand' }), { name: '인테리어 이름' }));
-        }
-        L6.push(Object.assign(li(ph6, 50, y6 + 62, 760, 400, 0, '인테리어 사진'), { strokeW: afs(1), stroke: 'brand' }));
-        y6 += 502;
-      }
-      if (y6 > 339) {
-        out.push(await autoSection('interior', '인테리어', '#ffffff', y6 - 40 + 100, L6));
-        if (smallW) warn.push('인테리어 사진은 홈페이지 E모델하우스 그림이라 작아요 (가로 ' + smallW + 'px). 견본주택 사진이 있으면 대지에서 사진을 눌러 바꿔 주세요');
+    // 인테리어 (팀 03_interior_m): 고른 사진(E모델하우스 캡처 · 홈페이지 사진 · 빈 칸)과 모양(규칙대로 · 타입마다 슬라이드) → intSections
+    if (on('interior')) {
+      prog('인테리어', 18);
+      var ispec = await intItems(P, prog, warn);
+      if (ispec.items.length) {
+        (await intSections(ispec)).forEach(function (x) { out.push(x); });
+        if (ispec.src === 'empty') warn.push('인테리어는 빈 칸으로 만들었어요 (' + ispec.items.map(function (x) { return x.label + ' ' + x.room; }).join(' · ') + '). 캡처한 사진은 인테리어 섹션 오른쪽 칸에서 넣어요');
+        else if (ispec.src === 'vr') warn.push('인테리어는 E모델하우스에서 찍었어요: ' + ispec.items.map(function (x) { return x.label + ' ' + x.room; }).join(' · '));
       }
     }
     // 프리미엄: 무조건 우리 템플릿으로 다시 디자인 (홈페이지 프리미엄 그림을 그대로 쓰지 않음)
@@ -8460,8 +8662,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   //   + 오른쪽 키맵(동 배치) + 아래 평면도. 홈페이지 평면이 통 그림(평면도 + 키맵 + 특화 설명)일 때
   async function typeSlideCard(t, fileK) {
     var plan = t.plan ? await createImageBitmap(t.plan.blob) : null, key = t.key ? await createImageBitmap(t.key.blob) : null;
-    var areas = (t.areas || []).slice(0, 7), top = t.units ? 171 : 140, step = areas.length > 5 ? 44 : 52;
-    var cardH = Math.max(430, top + Math.max(0, areas.length - 1) * step + 24 + 30);
+    // 줄 칸: 흰 선(top-14)부터 step 높이씩, 글은 칸 가운데. 카드 높이 = 마지막 칸 + 아래 여백 (위 여백과 맞게 · 키맵이 들어갈 만큼은)
+    var areas = (t.areas || []).slice(0, 7), top = t.units ? 171 : 140, step = areas.length > 5 ? 44 : 52, line0 = top - 14;
+    var cardH = Math.max(areas.length ? line0 + areas.length * step + 22 : top + 30, key ? 330 : 0, t.units ? 200 : 170);
     var pw = 760, ph = plan ? Math.round(Math.min(pw * plan.height / plan.width, 1000)) : 0, pW = plan ? Math.round(ph * plan.width / plan.height) : 0;
     var H = cardH + (plan ? 60 + ph : 0) + 60, c = canvas(AW, H), x = c.getContext('2d'), brand = normHex(state.brand) || '#001241', onb = onBrand();
     var disp = /^\d{2,3}[A-Za-z]{0,3}\d?$/.test(t.name || '') ? String(t.name).replace(/^(\d{2,3})/, '$1㎡') : (t.name || '');   // 84A → 84㎡A (팀 템플릿처럼)
@@ -8470,14 +8673,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     x.textBaseline = 'top'; x.fillStyle = onb; x.textAlign = 'center';
     x.font = fontCss('gmarket', 700, 60); x.fillText(disp, 215, 27);
     if (t.units) { x.font = fontCss('pretendard', 700, 26); x.fillText(t.units, 215, 106); }
-    x.fillRect(20, top - 14, 390, 1);
+    if (areas.length) x.fillRect(20, line0, 390, 1);
+    x.textBaseline = 'middle';
     areas.forEach(function (a, k) {
-      var yy = top + k * step;
-      x.font = fontCss('pretendard', 400, 20); x.textAlign = 'left'; x.fillText(a[0], 60, yy);
-      x.textAlign = 'right'; x.fillText(a[1], 370, yy);
-      if (k < areas.length - 1) { x.globalAlpha = 0.45; x.fillRect(60, yy + step - 14, 310, 1); x.globalAlpha = 1; }
+      var yy = line0 + k * step;
+      x.font = fontCss('pretendard', 400, 20); x.textAlign = 'left'; x.fillText(a[0], 60, yy + step / 2 + 1);
+      x.textAlign = 'right'; x.fillText(a[1], 370, yy + step / 2 + 1);
+      if (k < areas.length - 1) { x.globalAlpha = 0.45; x.fillRect(60, yy + step, 310, 1); x.globalAlpha = 1; }
     });
-    x.textAlign = 'left';
+    x.textAlign = 'left'; x.textBaseline = 'top';
     if (key) {   // 키맵: 오른쪽 칸(460~840)에 비율 그대로
       var bw = 380, bh = cardH - 60, sc = Math.min(bw / key.width, bh / key.height, 2), kw = Math.round(key.width * sc), kh = Math.round(key.height * sc);
       x.imageSmoothingQuality = 'high'; x.drawImage(key, 460 + (bw - kw) / 2, 30 + (bh - kh) / 2, kw, kh); key.close();
@@ -8531,6 +8735,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     for (var i = 0; i < s.autoTypes.length; i++) ims.push(await typeSlide(s.autoTypes[i], s.autoTypeForm));
     s.images = ims;
     s.autoBand = null;
+    // 왼쪽 카드 모양: 띠 안 화살표가 왼쪽 면적 글을 덮음 → 화살표는 슬라이드 가운데 (평면도 옆 빈 곳)
+    s.band = s.autoTypeForm === 'card' && !s.autoTypes.every(function (t) { return t.asis; }) ? 0 : null;
   }
 
   /* ---------- 메인 색이 바뀌면: 바탕·타입 그림 다시 ---------- */
@@ -8541,10 +8747,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       var secs = allSecs(), bases = secs.filter(function (s) { return s.auto && (s.auto.bg === 'brand' || s.auto.bg === 'tint'); }), types = secs.filter(function (s) { return s.autoTypes; });
       var icl = [];   // 메인 색으로 그린 아이콘 레이어 (사업개요 등)
       secs.forEach(function (s) { (s.fl || []).forEach(function (L) { if (L.icon && L.iconColor === 'brand') icl.push(L); }); });
-      if (!bases.length && !types.length && !icl.length) return;
+      var ints = secs.filter(function (s) { return s.autoInterior && s.autoInterior.form === 'slide'; });   // 인테리어 슬라이드도 메인 색으로 그림
+      if (!bases.length && !types.length && !icl.length && !ints.length) return;
       for (var q = 0; q < icl.length; q++) { var nim = await iconIm(icl[q].icon, 'brand', 100); if (nim) icl[q].img = nim; }
       for (var i = 0; i < bases.length; i++) await autoBase(bases[i]);
       for (var j = 0; j < types.length; j++) await redrawTypes(types[j]);
+      for (var q2 = 0; q2 < ints.length; q2++) await intRebuild(ints[q2]);
       afterImagesChanged();
       changed({});
     }, 450);
@@ -8577,7 +8785,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (e.target.id === 'imp-auto') { autoStart().catch(autoFail); return; }
     if (e.target.id === 'au-back') { if (lastScan) openScan(lastScan); return; }
     if (e.target.id === 'au-pdf-types' && autoPlan) {   // 타입은 공급안내 PDF에서
-      var cp0 = $('#au-copy'); if (cp0) autoCopyDraft = cp0.value;
+      auSaveOpts();
       openPdfPick({ mode: 'types' }).then(async function (r) {
         if (r && r.how === 'cards') { busy('타입 카드 찾는 중…'); try { autoPlan.pdfCards = await pdfAllCards(r.pages); } catch (er) { toast('PDF 타입을 못 읽었어요: ' + (er.message || er)); } finally { unbusy(); } }
         autoShowPlan();
@@ -8587,8 +8795,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (e.target.id === 'au-go') {
       var picks = $$('#modal-box [data-au]').filter(function (c) { return c.checked && !c.disabled; }).map(function (c) { return c.getAttribute('data-au'); });
       if (!picks.length) { toast('만들 섹션을 골라 주세요'); return; }
-      var pp = $('#au-prem-pic'), cp = $('#au-copy');
-      autoCopyDraft = cp ? cp.value : '';
+      var pp = $('#au-prem-pic');
+      auSaveOpts();
+      if (autoPlan.intSrc === 'vr' && !autoPlan.vrUrl) autoPlan.intSrc = 'empty';
       autoBuild(picks, pp ? pp.value : 'stock', autoCopyDraft).catch(autoFail);
       return;
     }
@@ -8655,14 +8864,75 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           (t.asis ? '' : '<textarea class="inp" rows="3" data-au-t="' + k + '" data-k="areas" placeholder="한 줄에 하나: 전용면적 84.0352㎡">' + esc(t.areas.map(function (a) { return a[0] + ' ' + a[1]; }).join('\n')) + '</textarea>') + '</div></div>';
       }).join('') + '</div><div class="ly-acts"><button type="button" class="btn small primary" data-au-act="redraw">다시 그리기</button></div>';
     }
+    if (s.autoInterior) {
+      var ai = s.autoInterior;
+      h += '<div class="field" style="margin-top:12px"><span class="lab">인테리어 모양</span><div class="seg small"><button type="button" data-ai-form="rule"' + (ai.form !== 'slide' ? ' class="is-on"' : '') + '>규칙대로 (세로로)</button><button type="button" data-ai-form="slide"' + (ai.form === 'slide' ? ' class="is-on"' : '') + '>타입마다 슬라이드</button></div></div>' +
+        '<div class="field"><span class="lab">E모델하우스 캡처</span><div class="row"><input class="inp" data-ai-url spellcheck="false" value="' + esc(ai.url || '') + '" placeholder="E모델하우스 주소"><button type="button" class="btn small" data-ai-act="vr">찍어서 다시 만들기</button></div>' +
+        '<p class="ly-note">사내 서버 에디터에서만 돼요 (1분쯤). 타입 2~3개면 타입마다 거실·침실, 1개면 거실·주방·침실·욕실을 찍어요. 슬라이드 모양이면 타입마다 4곳.</p></div>' +
+        '<div class="ai-list">' + ai.items.map(function (it, k) {
+          return '<div class="ai-item">' + (it.im ? '<img src="' + it.im.url + '" alt="">' : '<span class="ai-empty">빈 칸</span>') +
+            '<input class="inp" data-ai-i="' + k + '" data-k="label" value="' + esc(it.label || '') + '" placeholder="타입 (84㎡A)">' +
+            '<input class="inp" data-ai-i="' + k + '" data-k="room" value="' + esc(it.room || '') + '" placeholder="거실">' +
+            '<label class="btn small" title="캡처한 사진 넣기">사진<input type="file" accept="image/*" hidden data-ai-file="' + k + '"></label>' +
+            '<button type="button" class="icon danger" data-ai-del="' + k + '" title="이 칸 빼기">✕</button></div>';
+        }).join('') + '</div>' +
+        '<div class="ly-acts"><button type="button" class="btn small" data-ai-act="add">+ 칸</button><button type="button" class="btn small" data-ai-act="slots" title="지금 타입 이름으로 규칙대로 빈 칸 다시">빈 칸으로 (규칙대로)</button><button type="button" class="btn small primary" data-ai-act="redraw">다시 그리기</button></div>';
+    }
     h += '<div class="ly-acts" style="margin-top:12px"><button type="button" class="btn small" data-au-act="pdf" title="공급안내·브로슈어 PDF에서">' + (s.autoTypes ? 'PDF에서 타입 불러오기' : '자료 넣기 (PDF 페이지로 바꾸기)') + '</button></div>';
     return h + '</div>';
   }
   function auSec(el) { var w = el.closest('[data-au-sec]'); return w ? secAny(w.getAttribute('data-au-sec')) : null; }
   async function autoSetBg(s, bg) { s.auto.bg = bg; await autoBase(s); renderSections(); changed({}); }
   var auHost = $('#panel');
+  function intSlotsFrom(items, form) {   // 지금 타입 이름으로 규칙대로 빈 칸 (타입 1개 또는 슬라이드 = 거실·주방·침실·욕실, 아니면 거실·침실)
+    var labs = items.map(function (it) { return it.label; }).filter(function (l, k, arr) { return l && arr.indexOf(l) === k; });
+    if (!labs.length) labs = ['타입A', '타입B'];
+    var rooms = form === 'slide' || labs.length === 1 ? INT_ROOMS4 : ['거실', '침실'], sl = [];
+    labs.slice(0, form === 'slide' ? 6 : 3).forEach(function (l) { rooms.forEach(function (r) { sl.push({ type: l.replace('㎡', ''), label: l, room: r, im: null }); }); });
+    return sl;
+  }
+  // 인테리어 오른쪽 칸: 모양 바꾸기 · E모델하우스 찍기 · 칸 더하기·빼기 · 다시 그리기
+  async function intClick(s, e) {
+    var ai = s.autoInterior, f = e.target.closest('[data-ai-form]'), a = e.target.closest('[data-ai-act]'), dl = e.target.closest('[data-ai-del]');
+    if (f) {
+      var fv = f.getAttribute('data-ai-form'); if (fv === ai.form) return true;
+      var patch = { form: fv }, bare = ai.items.every(function (it) { return !it.im; });
+      if (bare) patch.items = intSlotsFrom(ai.items, fv);   // 빈 칸뿐이면 방 구성도 새 모양 규칙대로 (세로 = 거실·침실 · 슬라이드 = 4곳)
+      busy('인테리어 다시 그리는 중…'); try { await intRebuild(s, patch); } finally { unbusy(); }
+      var few = fv === 'slide' && !bare && !ai.items.some(function (it) { return /주방|욕실/.test(it.room || ''); });
+      toast((fv === 'slide' ? '타입마다 슬라이드로 바꿨어요' : '규칙대로(세로로) 바꿨어요') + (few && ai.src === 'vr' ? '. 주방·욕실까지 넣으려면 [찍어서 다시 만들기]를 눌러 주세요' : ''));
+      return true;
+    }
+    if (dl) { var items = ai.items.slice(); items.splice(+dl.getAttribute('data-ai-del'), 1); await intRebuild(s, { items: items }); return true; }
+    if (!a) return false;
+    var act = a.getAttribute('data-ai-act');
+    if (act === 'vr') {
+      var ui = document.querySelector('[data-au-sec="' + s.id + '"] [data-ai-url]'), url = ui ? ui.value.trim() : ai.url;
+      if (!url) { toast('E모델하우스 주소를 넣어 주세요'); return true; }
+      busy('E모델하우스 찍는 중… (1분쯤 걸려요)');
+      try { var vi = await vrItems(url, ai.form); vi.forEach(function (it) { it.vr = true; }); await intRebuild(s, { src: 'vr', url: url, items: vi }); toast('E모델하우스에서 ' + vi.length + '곳을 찍었어요'); }
+      catch (err) { toast(vrErr(err)); }
+      finally { unbusy(); }
+      return true;
+    }
+    if (act === 'add') { await intRebuild(s, { items: ai.items.concat([{ type: '', label: (ai.items[ai.items.length - 1] || {}).label || '', room: '거실', im: null }]) }); return true; }
+    if (act === 'slots') { await intRebuild(s, { src: 'empty', items: intSlotsFrom(ai.items, ai.form) }); return true; }
+    if (act === 'redraw') { busy('인테리어 다시 그리는 중…'); try { await intRebuild(s); } finally { unbusy(); } toast('인테리어를 다시 그렸어요'); return true; }
+    return false;
+  }
+  auHost.addEventListener('change', async function (e) {
+    var s = auSec(e.target); if (!s || !s.autoInterior) return;
+    var inp = e.target.closest('[data-ai-i]'), fi = e.target.closest('[data-ai-file]');
+    if (inp) { var it = s.autoInterior.items[+inp.getAttribute('data-ai-i')]; if (it) { it[inp.getAttribute('data-k')] = inp.value.trim(); changed({}); } return; }
+    if (fi && fi.files.length) {
+      var k = +fi.getAttribute('data-ai-file'), items = s.autoInterior.items.slice(), im = await loadImg(fi.files[0], fi.files[0].name);
+      items[k] = Object.assign({}, items[k], { im: im, vr: true });
+      await intRebuild(s, { items: items }); toast('사진을 넣었어요');
+    }
+  });
   auHost.addEventListener('click', async function (e) {
     var s = auSec(e.target); if (!s) return;
+    if (s.autoInterior && await intClick(s, e)) return;
     var fm = e.target.closest('[data-au-form]');
     if (fm && s.autoTypes) { s.autoTypeForm = fm.getAttribute('data-au-form'); await redrawTypes(s); afterImagesChanged(); renderSections(); changed({}); toast(s.autoTypeForm === 'card' ? '왼쪽 카드 + 키맵 모양으로 바꿨어요' : '위 띠 + 평면도 모양으로 바꿨어요'); return; }
     var c = e.target.closest('[data-au-bg]'), a = e.target.closest('[data-au-act]');
@@ -9093,10 +9363,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   // 테스트·자동화용
   // 에디터 버전: 배포할 때마다 올림 (v월.일.그날 몇 번째) · 위쪽 제목 옆에 보임
-  var EDITOR_VERSION = 'v10.28.2';
+  var EDITOR_VERSION = 'v10.28.4';
   if ($('#tb-ver')) $('#tb-ver').textContent = EDITOR_VERSION;
   window.__editor = {
     version: EDITOR_VERSION,
+    interior: function () { return { items: intItems, sections: intSections, rebuild: intRebuild, vr: vrItems, slots: intSlots, err: vrErr }; },
     pdf: function () { return { open: pdfOpen, info: pdfInfo, cards: pdfTypeCards, allCards: pdfAllCards, toTypes: cardsToTypes, files: pdfFiles, pick: openPdfPick, toSection: pdfToSection, start: pdfStart, ready: pdfReady, typeSlide: typeSlide }; },
     auto: function () { return { plan: autoPlan, start: autoStart, build: autoBuild, stock: STOCK.length, copyIntro: copyIntro, introBoxes: introBoxes, emLine: emLine, introBuild: introBuild, premiumOcr: premiumOcr, reflowIm: reflowIm }; },
     state: function () { return state; }, render: function () { render(); }, lastZip: function () { return lastZip; }, placed: function () { return lastPlaced; }, renderPage: renderPage, scan: function () { return lastScan; }, ab: function () { return ab; }, abApi: function () { return abApi; }, readTitle: readTitle, fileTitle: fileTitle,
