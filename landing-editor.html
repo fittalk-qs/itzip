@@ -717,6 +717,10 @@
   .ic-pic img { width: 44px; height: 44px; display: block; }
   .ic-pic img.comm { padding: 9px; border-radius: 50%; box-sizing: border-box; }
   .ic-pic span { line-height: 1.25; text-align: center; word-break: keep-all; }
+  /* 섹션 이미지 뽑기 */
+  .shot-list { display: grid; gap: 6px; max-height: 46vh; overflow: auto; margin-top: 10px; }
+  .shot-list .chk { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font-size: 13px; }
+  .shot-list .chk span { color: var(--label); font-size: 12px; font-family: ui-monospace, Consolas, monospace; }
   /* 인테리어 선택지 */
   .au-int-r { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 4px 0 6px; }
   .au-int-r label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
@@ -769,6 +773,7 @@
       <svg class="tt-sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM2 13h2a1 1 0 0 0 0-2H2a1 1 0 0 0 0 2zm18 0h2a1 1 0 0 0 0-2h-2a1 1 0 0 0 0 2zM11 2v2a1 1 0 0 0 2 0V2a1 1 0 0 0-2 0zm0 18v2a1 1 0 0 0 2 0v-2a1 1 0 0 0-2 0zM5.99 4.58a1 1 0 0 0-1.41 1.41l1.06 1.06a1 1 0 0 0 1.41-1.41L5.99 4.58zm12.37 12.37a1 1 0 0 0-1.41 1.41l1.06 1.06a1 1 0 0 0 1.41-1.41l-1.06-1.06zm1.06-10.96a1 1 0 0 0-1.41-1.41l-1.06 1.06a1 1 0 0 0 1.41 1.41l1.06-1.06zM7.05 18.36a1 1 0 0 0-1.41-1.41l-1.06 1.06a1 1 0 0 0 1.41 1.41l1.06-1.06z"/></svg>
       <i aria-hidden="true"></i>
     </button>
+    <button class="btn" id="shots-btn" type="button" title="섹션마다 글·사진까지 얹힌 완성 그림(가로 860)으로 뽑기 · 팀 피그마 프레임 이름">섹션 이미지</button>
     <button class="btn primary" id="export-btn" type="button">zip 만들기</button>
   </div>
 </header>
@@ -6900,7 +6905,108 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
 
-  abApi = { select: abSelect, selectFl: abSelectFl, mode: abMode, tool: abTool, zoomAt: abZoomAt, fitAll: abFitAll, align: abAlign, add: abAddLayer, del: abDelete, dup: abDuplicate, nudge: abNudge, order: abOrder, pick: abPick, board: abBoardByKey, toScreen: abToScreen, el: abEl, list: flList };
+  /* ---------- 섹션별 완성 이미지 (팀 피그마 860 프레임처럼 섹션 하나 = 그림 한 장) ----------
+     대지(모바일) 안 섹션을 화면 그대로 그림으로 구움 (html-to-image · 글꼴·자른 사진·테두리까지) → 가로 860 → zip
+     이름 = 에디터 파일 규칙 (01_hero_m · 04_premium_m · 98_type_m · type_84A …) → 이 zip을 다시 [이미지 올리기]에 넣어도 제자리 */
+  var H2I_SRC = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
+  var SEC_FILE = { intro: '02_intro_m', interior: '03_interior_m', premium: '04_premium_m', location: '05_location_m', community: '06_community_m', siteplan: '07_siteplan_m', types: '98_type_m', summary: '99_sum_m', news: '99_news_m', event: 'event' };
+  var shotFmt = 'jpg', shotItems = [];
+  function shotList() {
+    var out = [];
+    if (state.editing === 'main' && state.heroBg) out.push({ id: 's-top', label: '히어로', base: '01_hero_m', kind: 'render' });
+    if (state.editing === 'main' && state.badge) out.push({ label: '히어로 배지 (투명 원본)', base: '00_hero_m', kind: 'badge' });
+    var seq = 2;
+    state.sections.forEach(function (s) {
+      if (s.kind === 'form' || s.kind === 'video') return;
+      var has = filled(s) || (s.fl && s.fl.length) || (s.kind === 'text' && (s.texts || []).some(function (t) { return String(t.text || '').trim(); }));
+      if (!has) return;
+      seq++;
+      var ik = String(s.id || '').replace(/^s-/, '').replace(/-title$|-\d+$/, ''), key = SEC_FILE[s.key] ? s.key : { type: 'types', sum: 'summary' }[ik] || (SEC_FILE[ik] ? ik : '');   // zip에서 불러온 섹션은 id(s-type-title …)로
+      var base = SEC_FILE[key] || (pad2(Math.min(seq, 97)) + '_' + String(s.label || '섹션').replace(/[\\/:*?"<>|\s]+/g, '_'));
+      if (s.mode === 'slide' && s.images && s.images.length) {
+        if (s.header) out.push({ id: s.id, label: s.label + ' · 제목', base: base, key: key, kind: 'header', s: s });
+        out.push({ id: s.id, label: s.label + ' · 슬라이드 ' + s.images.length + '장', base: base, key: key, kind: 'slides', s: s });
+      } else out.push({ id: s.id, label: s.label, base: base, key: key, kind: 'render', s: s });
+    });
+    var cnt = {}, seen = {};   // 같은 이름 → _01 _02 (슬라이드는 따로 번호)
+    out.forEach(function (o) { if (o.kind !== 'slides') cnt[o.base] = (cnt[o.base] || 0) + 1; });
+    out.forEach(function (o) { if (o.kind !== 'slides' && cnt[o.base] > 1) { seen[o.base] = (seen[o.base] || 0) + 1; o.file = o.base + '_' + pad2(seen[o.base]); } else o.file = o.base; });
+    return out;
+  }
+  function shotExt(im) { return /png/.test(im.type || '') ? '.png' : /webp/.test(im.type || '') ? '.webp' : '.jpg'; }
+  function slideFile(o, im, k) {   // 타입 슬라이드 = type_84A (에디터가 이름에서 타입을 읽음) · 나머지 = 제목 이름_01
+    var lab = String(im.label || '').replace(/㎡|m²/g, '').replace(/[\\/:*?"<>|\s]+/g, '').trim();
+    return o.key === 'types' && lab ? 'type_' + lab : o.base + '_' + pad2(k + 1);
+  }
+  async function shotRender(b, id, fmt) {
+    var w = b.doc.defaultView, el = b.doc.getElementById(id);
+    if (!el) throw new Error('대지에서 섹션을 못 찾았어요');
+    if (!w.htmlToImage) await new Promise(function (ok, no) {
+      var sc = b.doc.createElement('script'); sc.src = H2I_SRC; sc.onload = ok;
+      sc.onerror = function () { no(new Error('그림 굽는 도구를 못 받았어요 (인터넷 연결을 확인해 주세요)')); };
+      b.doc.head.appendChild(sc);
+    });
+    try { await b.doc.fonts.ready; } catch (e) { /* 글꼴 기다리기 실패 → 그대로 */ }
+    var r = el.getBoundingClientRect(), pr = Math.min(860 / r.width, 16000 / Math.max(1, r.height));   // 아주 긴 섹션은 세로 16000px 까지
+    var opt = { pixelRatio: pr, cacheBust: false, backgroundColor: '#ffffff' };
+    if (fmt === 'png') return w.htmlToImage.toBlob(el, opt);
+    opt.quality = 0.92;
+    return (await fetch(await w.htmlToImage.toJpeg(el, opt))).blob();
+  }
+  function openShots() {
+    shotItems = shotList();
+    if (!shotItems.length) { toast('뽑을 섹션이 없어요'); return; }
+    modal('<h3>섹션 이미지 뽑기</h3><p class="desc">섹션마다 글·사진·상자까지 다 얹힌 <b>완성 그림</b>을 가로 860px로 뽑아요 (팀 피그마 프레임처럼). 이름이 에디터 규칙대로라 이 zip을 다시 [이미지 올리기]에 넣어도 제자리를 찾아요.</p>' +
+      '<div class="shot-list">' + shotItems.map(function (o, k) {
+        return '<label class="chk"><input type="checkbox" data-shot="' + k + '" checked><b>' + esc(o.label) + '</b><span>' + esc(o.kind === 'slides' ? (o.key === 'types' ? 'type_' + (String((o.s.images[0] || {}).label || '84A').replace(/㎡|\s/g, '')) + ' …' : o.base + '_01 …') : o.file) + '</span></label>';
+      }).join('') + '</div>' +
+      '<div class="field" style="margin-top:10px"><span class="lab">파일 형식</span><div class="seg small" id="shot-fmt"><button type="button" data-v="jpg"' + (shotFmt === 'jpg' ? ' class="is-on"' : '') + '>JPG (가벼움)</button><button type="button" data-v="png"' + (shotFmt === 'png' ? ' class="is-on"' : '') + '>PNG (글자 또렷 · 무거움)</button></div></div>' +
+      '<div class="acts"><button class="btn" type="button" data-close>닫기</button><button class="btn primary" type="button" id="shot-go">zip으로 받기</button></div>', 'wide');
+  }
+  async function runShots(picks) {
+    var wasOn = abOn(), fmt = shotFmt, zip = new JSZip(), fails = [], n = 0;
+    modal('<h3>섹션 이미지 굽는 중…</h3><div class="progress"><i id="shot-pg" style="width:3%"></i></div><div class="desc" id="shot-txt">대지 준비 중</div>');
+    var prog = function (t, p) { var a = $('#shot-txt'), b2 = $('#shot-pg'); if (a) a.textContent = t; if (b2) b2.style.width = p + '%'; };
+    try {
+      if (!wasOn) abMode(true);
+      var t0 = Date.now();
+      while (!(ab.boards.length && ab.boards.every(function (x) { return x.doc && x.h > 0; })) && Date.now() - t0 < 20000) await new Promise(function (r) { setTimeout(r, 200); });
+      await new Promise(function (r) { setTimeout(r, 600); });
+      var b = abBoardByKey('m') || ab.boards[0];
+      if (!b || !b.doc) throw new Error('대지를 못 열었어요');
+      for (var i = 0; i < picks.length; i++) {
+        var o = picks[i];
+        prog(o.label, Math.round(5 + i / picks.length * 85));
+        try {
+          if (o.kind === 'render') { zip.file(o.file + (fmt === 'png' ? '.png' : '.jpg'), await shotRender(b, o.id, fmt)); n++; }
+          else if (o.kind === 'badge') { zip.file(o.file + shotExt(state.badge), state.badge.blob); n++; }
+          else if (o.kind === 'header') { zip.file(o.file + shotExt(o.s.header), o.s.header.blob); n++; }
+          else o.s.images.forEach(function (im, k) { zip.file(slideFile(o, im, k) + shotExt(im), im.blob); n++; });
+        } catch (e) { fails.push(o.label + ' (' + (e.message || e) + ')'); }
+      }
+      prog('zip 묶는 중', 95);
+      if (!n) throw new Error(fails[0] || '뽑은 그림이 없어요');
+      var blob = await zip.generateAsync({ type: 'blob' }), url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = zipName().replace(/\.zip$/, '_섹션이미지.zip'); document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      $('#modal').hidden = true;
+      toast('섹션 이미지 ' + n + '장을 zip으로 받았어요' + (fails.length ? ' · 못 뽑은 것: ' + fails.join(', ') : ''));
+    } catch (e) {
+      modal('<h3>섹션 이미지를 못 뽑았어요</h3><p class="desc">' + esc(e.message || String(e)) + '</p><div class="acts"><button class="btn primary" type="button" data-close>닫기</button></div>');
+    } finally { if (!wasOn) abMode(false); }
+  }
+  $('#shots-btn').addEventListener('click', openShots);
+  $('#modal-box').addEventListener('click', function (e) {
+    var fb = e.target.closest('#shot-fmt button');
+    if (fb) { shotFmt = fb.getAttribute('data-v'); $$('#shot-fmt button').forEach(function (x) { x.classList.toggle('is-on', x === fb); }); return; }
+    if (e.target.id === 'shot-go') {
+      var picks = $$('#modal-box [data-shot]').filter(function (c) { return c.checked; }).map(function (c) { return shotItems[+c.getAttribute('data-shot')]; });
+      if (!picks.length) { toast('뽑을 섹션을 골라 주세요'); return; }
+      runShots(picks);
+    }
+  });
+
+  abApi = { shots: function () { return { list: shotList, render: shotRender, run: runShots, open: openShots }; }, select: abSelect, selectFl: abSelectFl, mode: abMode, tool: abTool, zoomAt: abZoomAt, fitAll: abFitAll, align: abAlign, add: abAddLayer, del: abDelete, dup: abDuplicate, nudge: abNudge, order: abOrder, pick: abPick, board: abBoardByKey, toScreen: abToScreen, el: abEl, list: flList };
   setTimeout(function () { abMode(!/[?&]view=preview/.test(location.search)); }, 0);
 
   /* =========================================================
@@ -9363,7 +9469,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   // 테스트·자동화용
   // 에디터 버전: 배포할 때마다 올림 (v월.일.그날 몇 번째) · 위쪽 제목 옆에 보임
-  var EDITOR_VERSION = 'v10.28.4';
+  var EDITOR_VERSION = 'v10.28.5';
   if ($('#tb-ver')) $('#tb-ver').textContent = EDITOR_VERSION;
   window.__editor = {
     version: EDITOR_VERSION,
