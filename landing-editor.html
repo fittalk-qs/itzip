@@ -88,6 +88,7 @@
   }
   .tb-l { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
   .tb-name { font-size: 14.5px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+  .tb-ver { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--surface-2); color: var(--sub); font-size: 11px; font-weight: 700; letter-spacing: 0; vertical-align: 1px; font-variant-numeric: tabular-nums; }
   .tb-sub { display: flex; gap: 8px; font-size: 12px; color: var(--sub); white-space: nowrap; }
   .tb-sub #tb-site { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
   .save-state { font-size: 12px; font-weight: 600; color: var(--sub); white-space: nowrap; }
@@ -710,7 +711,7 @@
 
 <header class="top">
   <div class="tb-l">
-    <b class="tb-name">분양 랜딩 에디터</b>
+    <b class="tb-name">분양 랜딩 에디터 <span class="tb-ver" id="tb-ver" title="에디터 버전 (업데이트할 때마다 올라가요)"></span></b>
     <span class="tb-sub"><span id="tb-site">현장명 없음</span><span class="save-state" id="save-state" aria-live="polite"></span></span>
   </div>
   <div class="tb-c">
@@ -7459,21 +7460,29 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return { layers: L, h: y - y0 - 60 };
   }
   // 평면 내용 그림(평면도 + 특화 설명이 세로로 긴 것) → 첫 평면도만
-  async function planCrop(im) {
+  // 평면 내용 통 그림(평면도 + 키맵 + 특화 설명이 세로로 긺) → {plan: 첫 평면도, key: 그 옆 키맵(동 배치 작은 그림)}
+  async function planParts(im) {
     try {
       var bmp = await createImageBitmap(im.blob), A = Math.min(520, bmp.width), H = Math.round(bmp.height * A / bmp.width);
-      if (H < A * 1.4) { bmp.close(); return im; }
+      if (H < A * 1.4) { bmp.close(); return { plan: im, key: null }; }
       var c = canvas(A, H), x = c.getContext('2d', { willReadFrequently: true });
       x.drawImage(bmp, 0, 0, A, H);
       var zp = zonePlan(x.getImageData(0, 0, A, H).data, A, H), its = [];
       zp.zones.forEach(function (z) { its = its.concat(z.items); });
       var it = its.find(function (q) { return (q.kind === 'plan' || q.kind === 'photo') && q.box.h > A * 0.25; });
-      if (!it) { bmp.close(); return im; }
-      var part = (it.parts && it.parts.length ? it.parts : [it.box]).slice().sort(function (a, b) { return b.w * b.h - a.w * a.h; })[0];
-      var rr = bmp.width / A, pad = 8, sx = Math.max(0, Math.round(part.x * rr) - pad), sy = Math.max(0, Math.round(it.box.y * rr) - pad), sw = Math.min(bmp.width - sx, Math.round(part.w * rr) + pad * 2), sh = Math.min(bmp.height - sy, Math.round(it.box.h * rr) + pad * 2);
-      var cc = canvas(sw, sh); cc.getContext('2d').drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh); bmp.close();
-      return loadImg(await toBlob(cc, 'image/png'), im.name.replace(/\.[a-z0-9]+$/i, '') + '_plan.png');
-    } catch (e) { return im; }
+      if (!it) { bmp.close(); return { plan: im, key: null }; }
+      var parts = (it.parts && it.parts.length ? it.parts : [it.box]).slice().sort(function (a, b) { return b.w * b.h - a.w * a.h; }), part = parts[0];
+      // 키맵 = 평면도 오른쪽(또는 왼쪽)의 두 번째로 큰 덩어리
+      var kp = parts.slice(1).find(function (p) { return p.w >= A * 0.15 && p.h >= A * 0.1 && (p.x >= part.x + part.w - 2 || p.x + p.w <= part.x + 2); }) || null;
+      var rr = bmp.width / A, cut = async function (b, y0, h0, nm) {
+        var pad = 8, sx = Math.max(0, Math.round(b.x * rr) - pad), sy = Math.max(0, Math.round(y0 * rr) - pad), sw = Math.min(bmp.width - sx, Math.round(b.w * rr) + pad * 2), sh = Math.min(bmp.height - sy, Math.round(h0 * rr) + pad * 2);
+        var cc = canvas(sw, sh); cc.getContext('2d').drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh);
+        return loadImg(await toBlob(cc, 'image/png'), im.name.replace(/\.[a-z0-9]+$/i, '') + nm);
+      };
+      var out = { plan: await cut(part, it.box.y, it.box.h, '_plan.png'), key: kp ? await cut(kp, kp.y, kp.h, '_key.png') : null };
+      bmp.close();
+      return out;
+    } catch (e) { return { plan: im, key: null }; }
   }
   // SVG(로고 등) → PNG (가로 800)
   async function svgPng(blob) {
@@ -7683,6 +7692,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }
     }
     var P = { home: home, noText: noText, types: types };
+    if (!noText && !d.data) P.noData = '중계 서버가 예전 코드라 스크립트로 그리는 홈페이지(메뉴·평면 데이터)는 일부만 읽어요. Cloudflare 중계 서버에 새 cloudflare/worker.js 를 붙여 넣으면 다 읽어요';
     var irow = pagesBy(d, /e\s*모델|모델\s*하우스|인테리어|유니트\s*(갤러리|vr)|interior|gallery/i, /(^|[\/_\-])(vr|interior|gallery|model)/i, /커뮤니티|community|오피스텔|officetel|_ot\b|c_vr/i)[0];
     if (irow) {   // 탭 이름(102C …) 다음 사진을 짝지음. 탭이 없으면 사진만
       var fi = home ? await scanCall({ op: 'text', url: irow.item.url }).catch(function () { return null; }) : null, itb = fi ? typesFromTabs(fi.flow, true) : [];
@@ -7820,7 +7830,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var had = MAIN().some(function (s) { return s.kind !== 'form' && filled(s); }) || !!state.heroBg;
     modal('<h3>메인 원페이지로 자동 구성</h3>' +
       '<p class="imp-sum"><b>' + esc(d.site.title || '') + '</b>' + (P.brand ? ' · 메인 색 <i class="au-sw" style="background:' + P.brand + '"></i>' + P.brand : '') + '<br>우리 규칙(섹션 제목·글자 크기·바탕색·순서)대로 만들어요. 글·사진·상자는 대지에서 하나씩 눌러 고칠 수 있어요.' +
-      (P.noText ? '<br><em>' + esc(P.noText) + '</em>' : '') + '</p>' +
+      (P.noText ? '<br><em>' + esc(P.noText) + '</em>' : '') + (P.noData ? '<br><em>' + esc(P.noData) + '</em>' : '') + '</p>' +
       '<div class="au-list">' + rows + '</div>' +
       '<div class="au-copy"><b>분양안내 (인트로)</b><span>분양상담사 문안을 붙여 넣으면 평면·입지·교통·커뮤니티처럼 다른 섹션과 겹치는 건 빼고, 계약 조건·혜택·특장점만 골라 만들어요 (비워 두면 안 만들어요)</span>' +
       '<textarea class="inp" id="au-copy" rows="4" placeholder="(광고)OO 분양소식&#10;■ 특별분양 조건&#10;- 발코니 확장비 무상 …">' + esc(autoCopyDraft) + '</textarea></div>' +
@@ -8025,13 +8035,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         var t = P.types[ti], ims = (await Promise.all(t.imgs.map(function (u) { return safe(u); }))).filter(Boolean);
         if (!ims.length) continue;
         var plan = bigOf(ims), key = ims.filter(function (im) { return im !== plan; }).sort(function (a, b) { return a.w * a.h - b.w * b.h; })[0] || null;
-        if (t.json && plan) plan = await planCrop(plan);   // 평면 데이터의 그림은 평면도 + 특화 설명이 세로로 긺 → 첫 평면도만
+        if (t.json && plan) { var pk = await planParts(plan); plan = pk.plan; if (pk.key) key = pk.key; }   // 평면 데이터의 통 그림(평면도 + 키맵 + 특화 설명) → 첫 평면도 · 키맵
         tlist.push({ name: t.name, units: t.units, areas: t.areas, plan: plan, key: key, asis: !!plan && plan.h >= plan.w * 0.9 && (t.tab || !t.areas.length) });
       }
       if (tlist.length) {
         var th = await autoSection('types', '타입안내', '#ffffff', 379, headLayers('TYPE GUIDE', '타입 안내', false), { id: 's-type-title' });
         var ts = newSection({ id: 's-type', key: 'types', label: '타입안내', order: SECTION_DEFS.types.order + 0.01, mode: 'slide', tabs: true, join: true, nav: false });
         ts.autoTypes = tlist;
+        ts.autoTypeForm = P.types.some(function (q) { return q.json; }) && tlist.some(function (q) { return q.key; }) ? 'card' : 'band';   // 통 그림 평면(키맵 있음) = 왼쪽 카드 모양 (팀 98_type_m 2871)
         await redrawTypes(ts);
         out.push(th, ts);
       }
@@ -8301,8 +8312,40 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
   /* ---------- 타입 슬라이드 그리기 (피그마 98_type_m: 왼쪽 메인 색 상자 + 오른쪽 동 배치 + 아래 평면도) ---------- */
   // 팀 템플릿 98_type_m (874): 위 메인 색 띠(이름 Gmarket 60 @31 · 세대수 Bold 26 @110 · 흰 선 @171 · 면적 줄 @201/245: 이름 Bold 26 + 값 26, 세로 선으로 나눔) + 아래 평면도
-  async function typeSlide(t) {
+  // 팀 템플릿 98_type_m (2871): 왼쪽 메인 색 카드 430 (이름 Gmarket 60 @27 · 세대수 Bold 26 @106 · 선 @157 · 면적 줄 20, 줄 간격 52, 이름 x60 · 값 오른쪽 끝 x370 · 줄 사이 선)
+  //   + 오른쪽 키맵(동 배치) + 아래 평면도. 홈페이지 평면이 통 그림(평면도 + 키맵 + 특화 설명)일 때
+  async function typeSlideCard(t, fileK) {
+    var plan = t.plan ? await createImageBitmap(t.plan.blob) : null, key = t.key ? await createImageBitmap(t.key.blob) : null;
+    var areas = (t.areas || []).slice(0, 7), top = t.units ? 171 : 140, step = areas.length > 5 ? 44 : 52;
+    var cardH = Math.max(430, top + Math.max(0, areas.length - 1) * step + 24 + 30);
+    var pw = 760, ph = plan ? Math.round(Math.min(pw * plan.height / plan.width, 1000)) : 0, pW = plan ? Math.round(ph * plan.width / plan.height) : 0;
+    var H = cardH + (plan ? 60 + ph : 0) + 60, c = canvas(AW, H), x = c.getContext('2d'), brand = normHex(state.brand) || '#001241', onb = onBrand();
+    var disp = /^\d{2,3}[A-Za-z]{0,3}\d?$/.test(t.name || '') ? String(t.name).replace(/^(\d{2,3})/, '$1㎡') : (t.name || '');   // 84A → 84㎡A (팀 템플릿처럼)
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, AW, H);
+    x.fillStyle = brand; x.fillRect(0, 0, 430, cardH);
+    x.textBaseline = 'top'; x.fillStyle = onb; x.textAlign = 'center';
+    x.font = fontCss('gmarket', 700, 60); x.fillText(disp, 215, 27);
+    if (t.units) { x.font = fontCss('pretendard', 700, 26); x.fillText(t.units, 215, 106); }
+    x.fillRect(20, top - 14, 390, 1);
+    areas.forEach(function (a, k) {
+      var yy = top + k * step;
+      x.font = fontCss('pretendard', 400, 20); x.textAlign = 'left'; x.fillText(a[0], 60, yy);
+      x.textAlign = 'right'; x.fillText(a[1], 370, yy);
+      if (k < areas.length - 1) { x.globalAlpha = 0.45; x.fillRect(60, yy + step - 14, 310, 1); x.globalAlpha = 1; }
+    });
+    x.textAlign = 'left';
+    if (key) {   // 키맵: 오른쪽 칸(460~840)에 비율 그대로
+      var bw = 380, bh = cardH - 60, sc = Math.min(bw / key.width, bh / key.height, 2), kw = Math.round(key.width * sc), kh = Math.round(key.height * sc);
+      x.imageSmoothingQuality = 'high'; x.drawImage(key, 460 + (bw - kw) / 2, 30 + (bh - kh) / 2, kw, kh); key.close();
+    }
+    if (plan) { x.imageSmoothingQuality = 'high'; x.drawImage(plan, (AW - pW) / 2, cardH + 60, pW, ph); plan.close(); }
+    var im = await loadImg(await toBlob(c, 'image/jpeg', 0.92), 'type_' + fileK + '.jpg');
+    im.label = t.name || ''; im.alt = '타입 ' + (t.name || '') + ' 평면도';
+    return im;
+  }
+  async function typeSlide(t, form) {
     var fileK = String(t.name || '').replace(/[^A-Za-z0-9]+/g, '') || 'type';
+    if (form === 'card' && !t.asis) return typeSlideCard(t, fileK);
     if (t.asis && t.plan) {   // 홈페이지 평면 그림이 이미 휴대폰용(세로 · 타입 이름 · 면적표 · 평면도가 다 있음) → 팀이 손으로 할 때처럼 그대로
       var a = await loadImg(t.plan.blob, 'type_' + fileK + (/png/.test(t.plan.type) ? '.png' : '.jpg'));
       a.label = t.name || ''; a.alt = '타입 ' + (t.name || '') + ' 평면도';
@@ -8341,7 +8384,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   async function redrawTypes(s) {
     await fontsReady(s.autoTypes.map(function (t) { return t.name + t.units + t.areas.join(''); }).join('') + '세대전용공급계약면적㎡');
     var ims = [];
-    for (var i = 0; i < s.autoTypes.length; i++) ims.push(await typeSlide(s.autoTypes[i]));
+    for (var i = 0; i < s.autoTypes.length; i++) ims.push(await typeSlide(s.autoTypes[i], s.autoTypeForm));
     s.images = ims;
     s.autoBand = null;
   }
@@ -8451,6 +8494,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     if (s.autoTypes) {
       var asis = s.autoTypes.every(function (t) { return t.asis; });
+      if (!asis) h += '<div class="field"><span class="lab">슬라이드 모양</span><div class="seg small"><button type="button" data-au-form="band"' + (s.autoTypeForm !== 'card' ? ' class="is-on"' : '') + '>위 띠 + 평면도</button><button type="button" data-au-form="card"' + (s.autoTypeForm === 'card' ? ' class="is-on"' : '') + '>왼쪽 카드 + 키맵</button></div></div>';
       h += '<p class="desc" style="margin:0 0 10px">' + (asis ? '홈페이지 평면 그림을 그대로 썼어요 (이미 휴대폰용). 이름을 고치면 탭 이름이 바로 바뀌어요.' : '타입 슬라이드는 아래 정보로 그린 그림이에요. 고치면 바로 다시 그려져요. 탭 이름 = 타입 이름.') + '</p><div class="au-types">' + s.autoTypes.map(function (t, k) {
         return '<div class="au-type' + (t.asis ? ' is-asis' : '') + '">' + (t.plan ? '<img src="' + t.plan.url + '" alt="">' : '<span></span>') + '<div><div class="au-type-r"><input class="inp" data-au-t="' + k + '" data-k="name" value="' + esc(t.name) + '" placeholder="타입 (예: 84A)">' +
           (t.asis ? '' : '<input class="inp" data-au-t="' + k + '" data-k="units" value="' + esc(t.units) + '" placeholder="세대수 (예: 240세대)">') + '</div>' +
@@ -8464,6 +8508,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   var auHost = $('#panel');
   auHost.addEventListener('click', async function (e) {
     var s = auSec(e.target); if (!s) return;
+    var fm = e.target.closest('[data-au-form]');
+    if (fm && s.autoTypes) { s.autoTypeForm = fm.getAttribute('data-au-form'); await redrawTypes(s); afterImagesChanged(); renderSections(); changed({}); toast(s.autoTypeForm === 'card' ? '왼쪽 카드 + 키맵 모양으로 바꿨어요' : '위 띠 + 평면도 모양으로 바꿨어요'); return; }
     var c = e.target.closest('[data-au-bg]'), a = e.target.closest('[data-au-act]');
     if (c && s.auto) { await autoSetBg(s, c.getAttribute('data-au-bg')); return; }
     if (!a) return;
@@ -8496,7 +8542,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (k === 'areas') t.areas = v2.split('\n').map(function (l) { var m = /^\s*(\S+)\s+(.+?)\s*$/.exec(l); return m ? [m[1], m[2]] : null; }).filter(Boolean);
       else t[k] = v2.trim();
       // 탭 이름(= 타입 이름)·그림을 바로 바꿈 → '탭 이름이 겹쳐요'가 고친 즉시 풀림
-      if (s.images.length === s.autoTypes.length) { s.images[+ti] = await typeSlide(t); s.autoBand = null; afterImagesChanged(); }
+      if (s.images.length === s.autoTypes.length) { s.images[+ti] = await typeSlide(t, s.autoTypeForm); s.autoBand = null; afterImagesChanged(); }
       changed({});
     }
   });
@@ -8507,7 +8553,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
 
   // 테스트·자동화용
+  // 에디터 버전: 배포할 때마다 올림 (v월.일.그날 몇 번째) · 위쪽 제목 옆에 보임
+  var EDITOR_VERSION = 'v10.27.6';
+  if ($('#tb-ver')) $('#tb-ver').textContent = EDITOR_VERSION;
   window.__editor = {
+    version: EDITOR_VERSION,
     auto: function () { return { plan: autoPlan, start: autoStart, build: autoBuild, stock: STOCK.length, copyIntro: copyIntro, introBoxes: introBoxes, emLine: emLine, introBuild: introBuild, premiumOcr: premiumOcr, reflowIm: reflowIm }; },
     state: function () { return state; }, render: function () { render(); }, lastZip: function () { return lastZip; }, placed: function () { return lastPlaced; }, renderPage: renderPage, scan: function () { return lastScan; }, ab: function () { return ab; }, abApi: function () { return abApi; }, readTitle: readTitle, fileTitle: fileTitle,
     store: { flush: autosave, addHistory: addHistory, list: function () { return getAll('snaps'); }, blobKeys: function () { return getAllKeys('blobs'); }, ready: function () { return storeReady; }, sid: SID },
